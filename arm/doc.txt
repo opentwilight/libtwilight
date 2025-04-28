@@ -1,0 +1,9 @@
+TODO: arm/starlet specific code goes here
+
+A cross-compiler targeting the starlet processor would be built here,
+any code that would assist in getting a starlet program using its hardware correctly,
+as well as some examples of IOS code, something like an extremely simplified version of bootmii,
+or cIOS patches, etc.
+
+Maybe even some custom IOS in the future, eg. written from scratch?
+Could allow for a more sophisticated use of the USB 2.0 standard, for example.

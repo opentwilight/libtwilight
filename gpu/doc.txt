@@ -1,0 +1,8 @@
+TODO: Anything related to the Flipper/GX goes here
+
+- registers
+- framebuffers
+- matrices
+- Blitting Processor
+- Command Processor
+- Transform Unit

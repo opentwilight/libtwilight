@@ -1,0 +1,5 @@
+TODO: microcode for the dsp goes here
+
+This microcode MUST be written from scratch.
+Additionally, code that describes or assists with interfacing with the DSP, such as registers,
+will be placed here, as well as any examples.
