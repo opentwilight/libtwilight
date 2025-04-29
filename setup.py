@@ -6,7 +6,6 @@ import shutil
 import subprocess
 
 GIT = "git"
-HOST_GCC = "gcc"
 HOST_CLANG = "clang"
 
 def ensure_path_binary(program_name, alternative_name=None):
@@ -19,15 +18,6 @@ def ensure_path_binary(program_name, alternative_name=None):
 		sys.exit(1)
 
 def main(args):
-	ensure_path_binary(GIT)
-	ensure_path_binary(HOST_GCC, HOST_CLANG)
-
-	if not os.path.isdir("gcc"):
-		status = subprocess.run(["git", "clone", "-b", "releases/gcc-15", "--single-branch", "https://github.com/gcc-mirror/gcc.git"])
-		if status.returncode != 0:
-			return
-
-	os.chdir("gcc")
-	subprocess.run(["./configure", "--target", "powerpc-750-eabi"])
+	ensure_path_binary(HOST_CLANG)
 
 main(sys.argv)
