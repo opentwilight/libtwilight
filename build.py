@@ -4,6 +4,6 @@ import sys
 import subprocess
 
 def main(args):
-	subprocess.run(["clang", "-target", "powerpc-eabi", "-m32", "-nostdlib", "poke_test.c", "-o", "poke_test.elf"])
+	subprocess.run(["clang", "-target", "powerpc-eabi", "-m32", "-nostdlib", "examples/poke_test.c", "-o", "examples/poke_test.elf"])
 
 main(sys.argv)
