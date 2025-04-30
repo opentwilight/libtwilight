@@ -7,7 +7,7 @@ int main() {
 	TW_VideoInit(&video_params);
 
 	TW_DataTerminal term_params = {
-		.col = 10,
+		.column = 10,
 		.row = 6,
 		.fore = 0xff80ff80,
 		.back = 0x00800080,

@@ -1,7 +1,9 @@
 #pragma once
 
 typedef struct {
-	u32 *xfb;
+	unsigned int *xfb;
+	int width;
+	int height;
 } TW_DataVideoInit;
 
 typedef struct {

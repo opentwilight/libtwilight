@@ -6,7 +6,7 @@ _start:
 	isync
 
 	lis 1, _stack_top@ha
-	ori 1, _stack_top@l
+	ori 1, 1, _stack_top@l
 	li 0, 0
 	mr 3, 0
 	stwu 3, -64(1)

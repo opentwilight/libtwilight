@@ -12,11 +12,11 @@ static void init_video(TW_DataVideoInit *params) {
 void TW_VideoInit(TW_DataVideoInit *params) {
 	TW_TwilightInit();
 	if (!_initialized) {
-		init_video();
+		init_video(params);
 		_initialized = 1;
 	}
 }
 
-void *TW_TerminalWrite(TW_DataTerminal *params, const char *chars, int len) {
+void TW_TerminalWriteAscii(TW_DataTerminal *params, const char *chars, int len) {
 	
 }
