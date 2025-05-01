@@ -1,14 +1,3 @@
-/*
-MEMORY {
-	. = 0x80003F00;
-	.stack : {
-		. = . + 0x30000;
-		__stack_top = .;
-		__heap_mem1_start = .;
-	}
-}
-*/
-
 SECTIONS {
 	. = 0x80003F00;
 	.text : { *(.text) *(.text.*) }
