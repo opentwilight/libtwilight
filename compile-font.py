@@ -43,6 +43,7 @@ def main(args):
 	out = "#pragma once\n\n"
 	out += "static const int _glyph_width = {0};\n".format(gw)
 	out += "static const int _glyph_height = {0};\n".format(gh)
+	out += "static const int _glyph_size = {0};\n".format(bytes_per_glyph)
 	out += "static const int _glyph_count = {0};\n".format(n_glyphs)
 	out += "\nstatic const unsigned char _glyph_data[] = {\n"
 
@@ -68,4 +69,4 @@ def main(args):
 if len(sys.argv) > 1:
 	main(sys.argv[1:])
 else:
-	main(["tw-ascii.png", "ppc/font.h", "16", "6", "9", "16"])
+	main(["tw-ascii.png", "ppc/font.h", "16", "6", "8", "16"])

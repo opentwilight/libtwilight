@@ -1,18 +1,18 @@
-#include <twilight.h>
+#include <twilight_ppc.h>
 
 typedef unsigned int u32;
 
 int main() {
-	TW_DataVideoInit video_params;
-	TW_VideoInit(&video_params);
+	TwVideo video_params;
+	TW_InitVideo(&video_params);
 
-	TW_DataTerminal term_params = {
+	TwTerminal term_params = {
 		.column = 10,
 		.row = 6,
 		.fore = 0xff80ff80,
 		.back = 0x00800080,
 	};
-	TW_TerminalWriteAscii(&term_params, "hello", 5);
+	TW_WriteTerminalAscii(&term_params, &video_params, "hello", 5);
 
 	return 0;
 }
