@@ -128,7 +128,9 @@ void TW_WriteTerminalAscii(TwTerminal *params, TwVideo *video, const char *chars
 	int home = start;
 	int home_col = col_origin;
 
-	unsigned blended = 0; // TODO
+	//*(volatile unsigned*)(0xff000000 | (line << 12) | limit) = 3;
+
+	unsigned blended = ((params->back >> 1) & 0x7f7f7f7f) + ((params->fore >> 1) & 0x7f7f7f7f);
 	unsigned colors[4];
 	colors[0] = params->back;
 	colors[1] = blended;
@@ -136,42 +138,48 @@ void TW_WriteTerminalAscii(TwTerminal *params, TwVideo *video, const char *chars
 	colors[3] = params->fore;
 
 	for (int i = start; i < limit; i++) {
-		if (chars[i] == '\n' || (!params->disable_wrap && col >= TERMINAL_COLS - 1)) {
-			int r = line % TERMINAL_ROWS;
-			if (home_col != 0) {
-				for (int j = 0; j < _glyph_height; j++) {
-					for (int k = 0; k < (home_col * _glyph_width) / 2; k++) {
-						video->xfb[((r * _glyph_height) + j) * 320 + k] = params->back;
-					}
-				}
-			}
-			// FIXME: this won't work for glyphs of an odd width
-			for (int j = 0; j < _glyph_height; j++) {
-				for (int k1 = home_col, k2 = home; k1 < col; k1++, k2++) {
-					int idx = (chars[k2] >= 0x20 && chars[k2] <= 0x7e) ? (chars[k2] - 0x20) : 0;
-					for (int l = 0; l < _glyph_width; l += 2) {
-						int bit_pos = idx * _glyph_size * 8 + j * _glyph_width + l;
-						int c = (_glyph_data[bit_pos / 8] >> (bit_pos % 8)) & 3;
-						video->xfb[((r * _glyph_height) + j) * 320 + (k1 * _glyph_width) + (l / 2)] = colors[c];
-					}
-				}
-			}
-			if (col < TERMINAL_COLS - 1) {
-				for (int j = 0; j < _glyph_height; j++) {
-					for (int k = (col * _glyph_width) / 2; k < ((TERMINAL_COLS - 1) * _glyph_width) / 2; k++) {
-						video->xfb[((r * _glyph_height) + j) * 320 + k] = params->back;
-					}
-				}
-			}
-			col = 0;
-			home = i;
-			if (chars[i] == '\n') {
-				col--;
-				home++;
-			}
-			home_col = 0;
-			line++;
+		int is_newline = chars[i] == '\n' || (!params->disable_wrap && col >= TERMINAL_COLS - 1);
+		if (i < limit-1 && !is_newline) {
+			col++;
+			continue;
 		}
-		col++;
+		int r = line % TERMINAL_ROWS;
+		if (home_col != 0) {
+			for (int j = 0; j < _glyph_height; j++) {
+				for (int k = 0; k < (home_col * _glyph_width) / 2; k++) {
+					video->xfb[((r * _glyph_height) + j) * 320 + k] = params->back;
+				}
+			}
+		}
+		// FIXME: this won't work for glyphs of an odd width
+		for (int j = 0; j < _glyph_height; j++) {
+			for (int k1 = home_col, k2 = home; k1 < col; k1++, k2++) {
+				int idx = (chars[k2] >= 0x20 && chars[k2] <= 0x7e) ? (chars[k2] - 0x20) : 0;
+				for (int l = 0; l < _glyph_width; l += 2) {
+					int bit_pos = idx * _glyph_size * 8 + j * _glyph_width + l;
+					int c = (_glyph_data[bit_pos >> 3] >> (6 - (bit_pos & 7))) & 3;
+					int offset = ((r * _glyph_height) + j) * 320 + (k1 * _glyph_width + l) / 2;
+					//*(volatile unsigned*)(0xff000000 | (unsigned)&video->xfb[offset]) = c;
+					video->xfb[offset] = colors[c];
+				}
+			}
+		}
+		if (col < TERMINAL_COLS - 1) {
+			for (int j = 0; j < _glyph_height; j++) {
+				for (int k = (col * _glyph_width) / 2; k < ((TERMINAL_COLS - 1) * _glyph_width) / 2; k++) {
+					video->xfb[((r * _glyph_height) + j) * 320 + k] = params->back;
+				}
+			}
+		}
+		if (chars[i] == '\n') {
+			col = 0;
+			home = i+1;
+		}
+		else {
+			col = 1;
+			home = i;
+		}
+		home_col = 0;
+		line++;
 	}
 }

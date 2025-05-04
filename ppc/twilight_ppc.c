@@ -28,8 +28,8 @@ void TW_InitTwilight(void) {
 }
 
 unsigned TW_GetFramebufferAddress(int *outSize) {
-	unsigned stack_top = __stack_bottom + __stack_size;
-	unsigned framebuffer = (stack_top + 0x1ff) & ~0x200;
+	unsigned stack_top = (unsigned)&__stack_bottom + __stack_size;
+	unsigned framebuffer = (stack_top + 0x1ff) & ~0x1ff;
 	int fb_size = 2 * 640 * 576;
 	if (outSize)
 		*outSize = fb_size;
