@@ -11,15 +11,15 @@ _start:
 
 	// __bss_start and __stack_bottom are guaranteed to be aligned to the nearest 32 bytes
 	lis 3, __stack_bottom@ha
-	ori 3, 3, __stack_bottom@l
+	addi 3, 3, __stack_bottom@l
 
 	lis 4, __stack_size@ha
-	ori 4, 4, __stack_size@l
+	addi 4, 4, __stack_size@l
 	lwz 4, 0(4)
 	add 1, 3, 4                 // set the top of stack to the bottom plus the stack size
 
 	lis 4, __bss_start@ha
-	ori 4, 4, __bss_start@l
+	addi 4, 4, __bss_start@l
 
 	li 24, 0
 	li 25, 0
@@ -38,38 +38,37 @@ _clear_bss:
 	blt- _clear_bss
 
 	lis 4, _tw_irq_handler_template@ha
-	ori 4, 4, _tw_irq_handler_template@l
+	addi 4, 4, _tw_irq_handler_template@l
 	lis 5, _tw_irq_handler_template_end@ha
-	ori 5, 5, _tw_irq_handler_template_end@l
+	addi 5, 5, _tw_irq_handler_template_end@l
 	lis 6, 0x8000
-	ori 6, 6, 0x100
+	addi 6, 6, 0x100
 	li 7, 0x16
 
 _instantiate_irq_handlers_outer:
 	mr 8, 6
-	rlwinm 9, 6, 24, 8, 31
+	rlwinm 9, 6, 24, 8, 31 // shift right by 8 bits
 	addis 9, 9, 0x37e0 // 0x3860 = 0x37e0 + (0x8000 >> 8)
+	addi 9, 9, -1 // 0x80000100 -> 0, 0x80000200 -> 1, 0x80000300 -> 2, etc.
 	stw 9, 0(8)
-_instantiate_irq_handlers_inner:
+_copy_irq_handler:
 	lwzu 9, 4(3)
 	stwu 9, 4(8)
 	cmpw 0, 3, 5
-	blt+ _instantiate_irq_handlers_inner
-	addi 7, 7, -1
-	cmpwi 0, 7, 0
-	beq+ _after_instantiate_irq_handlers
+	blt+ _copy_irq_handler
 	li 8, 0
-_flush_irq_handlers:
+_flush_irq_handler:
 	dcbf 0, 6
 	dcbst 0, 6
 	sync
 	icbi 0, 6
 	addi 6, 6, 0x20
 	cmpwi 0, 8, 8
-	blt+ _flush_irq_handlers
-	b _instantiate_irq_handlers_outer
+	blt+ _flush_irq_handler
+	addi 7, 7, -1
+	cmpwi 0, 7, 0
+	bgt+ _instantiate_irq_handlers_outer
 
-_after_instantiate_irq_handlers:
 	bl main
 	b .
 
@@ -95,7 +94,6 @@ _tw_irq_handler_template:
 
 	lis 5, _tw_irq_handler_impl@ha
 	ori 5, 5, _tw_irq_handler_impl@l
-	rlwinm 5, 5, 0, 0, 24
 	mtlr 5
 	blrl
 
