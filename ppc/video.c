@@ -11,31 +11,34 @@ static void init_video(TwVideo *params) {
 	unsigned height;
 	unsigned fb_addr = TW_GetFramebufferAddress((void*)0);
 
-	unsigned short vtr = PEEK_U16(VI_REG_BASE + 2);
-	params->format = (vtr >> 8) & 3;
-	params->is_progressive = (vtr >> 2) & 1;
+	unsigned short dcr = PEEK_U16(VI_REG_BASE + 2);
+	params->format = (dcr >> 8) & 3;
+	params->is_progressive = (dcr >> 2) & 1;
 
-	unsigned short dcr = 1 | ((params->format == 1) << 8);
-	POKE_U16(VI_REG_BASE + 2, dcr);
+	//POKE_U32(0xff000000 | dcr, 1);
+
+	//unsigned short dcr = ;
+	//POKE_U16(VI_REG_BASE + 2, (u16)(((params->format == 1) << 8) | 1));
 
 	if (params->format == 1) {
-		POKE_U32(VI_REG_BASE + 4, 0x4B6A01B0);
-		POKE_U32(VI_REG_BASE + 8, 0x02F85640);
+		//POKE_U32(VI_REG_BASE + 4, 0x4B6A01B0);
+		//POKE_U32(VI_REG_BASE + 8, 0x02F85640);
 		POKE_U32(VI_REG_BASE + 0xc, 0x00010023);
 		POKE_U32(VI_REG_BASE + 0x10, 0x00000024);
-		POKE_U32(VI_REG_BASE + 0x14, 0x4D2B4D6D);
-		POKE_U32(VI_REG_BASE + 0x18, 0x4D8A4D4C);
-		POKE_U32(VI_REG_BASE + 0x30, 0x113901B1);
-		POKE_U16(VI_REG_BASE + 0x2c, 0x013C);
-		POKE_U16(VI_REG_BASE + 0x2e, 0x0144);
+		//POKE_U32(VI_REG_BASE + 0x14, 0x4D2B4D6D);
+		//POKE_U32(VI_REG_BASE + 0x18, 0x4D8A4D4C);
+		//POKE_U32(VI_REG_BASE + 0x30, 0x113901B1);
+		//POKE_U16(VI_REG_BASE + 0x2c, 0x013C);
+		//POKE_U16(VI_REG_BASE + 0x2e, 0x0144);
 	} else {
-		POKE_U32(VI_REG_BASE + 4, 0x476901AD);
-		POKE_U32(VI_REG_BASE + 8, 0x02EA5140);
+		//POKE_U32(VI_REG_BASE + 4, 0x476901AD);
+		//POKE_U32(VI_REG_BASE + 8, 0x02EA5140);
 		POKE_U32(VI_REG_BASE + 0xc, 0x00030018);
 		POKE_U32(VI_REG_BASE + 0x10, 0x00020019);
-		POKE_U32(VI_REG_BASE + 0x14, 0x410C410C);
-		POKE_U32(VI_REG_BASE + 0x18, 0x40ED40ED);
-		POKE_U32(VI_REG_BASE + 0x30, 0x110701AE);
+		//POKE_U32(VI_REG_BASE + 0x14, 0x410C410C);
+		//POKE_U32(VI_REG_BASE + 0x18, 0x40ED40ED);
+		//POKE_U32(VI_REG_BASE + 0x30, 0x110701AE);
+		/*
 		if (params->is_progressive) {
 			POKE_U16(VI_REG_BASE + 0x2c, 0x0005);
 			POKE_U16(VI_REG_BASE + 0x2e, 0x0176);
@@ -44,11 +47,15 @@ static void init_video(TwVideo *params) {
 			POKE_U16(VI_REG_BASE + 0x2c, 0x0000);
 			POKE_U16(VI_REG_BASE + 0x2e, 0x0000);
 		}
+		*/
 	}
 
-	POKE_U32(VI_REG_BASE + 0x1c, (fb_addr & 0xfffe00));
-	POKE_U32(VI_REG_BASE + 0x20, 0x00000000);
-	POKE_U32(VI_REG_BASE + 0x24, (fb_addr & 0xfffe00));
+	unsigned fb_reg_value = 0x10000000 | (fb_addr >> 5);
+
+	POKE_U32(VI_REG_BASE + 0x1c, fb_reg_value);
+	//POKE_U32(VI_REG_BASE + 0x20, 0x00000000);
+	POKE_U32(VI_REG_BASE + 0x24, fb_reg_value);
+	/*
 	POKE_U32(VI_REG_BASE + 0x28, 0x00000000);
 	POKE_U32(VI_REG_BASE + 0x34, 0x10010001);
 	POKE_U32(VI_REG_BASE + 0x38, 0x10010001);
@@ -65,11 +72,14 @@ static void init_video(TwVideo *params) {
 	POKE_U32(VI_REG_BASE + 0x60, 0x13130F08);
 	POKE_U32(VI_REG_BASE + 0x64, 0x00080C0F);
 	POKE_U32(VI_REG_BASE + 0x68, 0x00FF0000);
+	*/
 	POKE_U16(VI_REG_BASE + 0x6c, params->is_progressive);
 
+	/*
 	POKE_U16(VI_REG_BASE + 0x70, 0x0280);
 	POKE_U16(VI_REG_BASE + 0x72, 0x0000);
 	POKE_U16(VI_REG_BASE + 0x74, 0x0000);
+	*/
 
 	params->width = width;
 	params->height = height;
@@ -137,6 +147,8 @@ void TW_WriteTerminalAscii(TwTerminal *params, TwVideo *video, const char *chars
 	colors[2] = blended;
 	colors[3] = params->fore;
 
+	//*(volatile unsigned*)(0xff000000 | (unsigned)&_glyph_data[0]) = 2;
+
 	for (int i = start; i < limit; i++) {
 		int is_newline = chars[i] == '\n' || (!params->disable_wrap && col >= TERMINAL_COLS - 1);
 		if (i < limit-1 && !is_newline) {
@@ -159,7 +171,13 @@ void TW_WriteTerminalAscii(TwTerminal *params, TwVideo *video, const char *chars
 					int bit_pos = idx * _glyph_size * 8 + j * _glyph_width + l;
 					int c = (_glyph_data[bit_pos >> 3] >> (6 - (bit_pos & 7))) & 3;
 					int offset = ((r * _glyph_height) + j) * 320 + (k1 * _glyph_width + l) / 2;
-					//*(volatile unsigned*)(0xff000000 | (unsigned)&video->xfb[offset]) = c;
+					/*
+					*(volatile unsigned*)(
+						0xff000000 |
+						((unsigned)&_glyph_data[bit_pos >> 3] << 8) |
+						(_glyph_data[bit_pos >> 3] & 0xff)
+					) = c;
+					*/
 					video->xfb[offset] = colors[c];
 				}
 			}
