@@ -10,41 +10,40 @@ _start:
 	isync
 
 	// initialize block address translations (BATs)
+	// involves setting HID0 (SPR 1008) to 0x00110c64 to disable icache and dcache, then restoring them afterward with 0x0011cc64
 	// TODO
 
 	// initialize L2 cache
-	// FIXME: skip over it for now
-
-	b _after_l2_setup
-
-	li 3, 0x30
+	li 3, 0x30 // disable everything except BATs
 	mtmsr 3
 	sync
 
-	mfspr 3, l2cr
+	// 1017 = L2 Cache Control Register
+	mfspr 3, 1017
 	rlwinm 3, 3, 0, 1, 31 // clear the MSB (L2E)
-	mtspr l2cr, 3
+	mtspr 1017, 3
 	sync
-	mfspr 3, l2cr
+	mfspr 3, 1017
 	oris 3, 3, 0x0020 // enable L2 global invalidation
-	mtspr l2cr, 3
+	mtspr 1017, 3
 
 _wait_for_l2cr_1:
-	mfspr 3, l2cr
+	mfspr 3, 1017
 	andi. 3, 3, 1
-	beq+ _wait_for_l2cr_1
+	bne+ _wait_for_l2cr_1
 
+	mfspr 3, 1017
 	rlwinm 3, 3, 0, 11, 9 // clear the invalidate bit (0x0020)
-	mtspr l2cr, 3
+	mtspr 1017, 3
 
 _wait_for_l2cr_2:
-	mfspr 3, l2cr
+	mfspr 3, 1017
 	andi. 3, 3, 1
-	beq+ _wait_for_l2cr_2
+	bne+ _wait_for_l2cr_2
 
 	oris 3, 3, 0x8000
 	rlwinm 3, 3, 0, 11, 9
-	mtspr l2cr, 3
+	mtspr 1017, 3
 	sync
 
 	// restore normal MSR
