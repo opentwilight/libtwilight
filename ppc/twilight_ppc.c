@@ -1,6 +1,7 @@
 #include "twilight_ppc.h"
 
-extern unsigned __stack_bottom;
+extern unsigned __toc_region;
+extern unsigned __toc_size;
 extern unsigned __stack_size;
 
 static int _initialized = 0;
@@ -28,7 +29,7 @@ void TW_InitTwilight(void) {
 }
 
 unsigned TW_GetFramebufferAddress(int *outSize) {
-	unsigned stack_top = (unsigned)&__stack_bottom + __stack_size;
+	unsigned stack_top = (unsigned)&__toc_region + __toc_size + __stack_size;
 	unsigned framebuffer = (stack_top + 0x1ff) & ~0x1ff;
 	int fb_size = 2 * 640 * 576;
 	if (outSize)

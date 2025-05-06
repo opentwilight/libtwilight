@@ -22,5 +22,5 @@ SECTIONS {
 	__bss_end = .;
 
 	. = ALIGN(0x40);
-	__stack_bottom = .;
+	__toc_region = .;
 }
