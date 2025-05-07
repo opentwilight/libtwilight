@@ -35,15 +35,17 @@ typedef struct {
 	unsigned *values;
 } TwHashMap;
 
-// structures.c -- NOT thread-safe -- many of these functions should be locked on the outside in a concurrent context
+// structures.c
+// NOT thread-safe -- many of these functions should be locked on the outside in a concurrent context
 TwHeapAllocator TW_MakeHeap(void *startAddress, void *endAddress);
 int TW_CalcHeapObjectInnerSize(int count, int elemSize);
 void *TW_AllocateHeapObject(TwHeapAllocator *alloc, int count, int elemSize);
 void TW_FreeHeapObject(TwHeapAllocator *alloc, void *ptr);
-
 unsigned TW_GetStringHash(const char *str, int len);
 TwHashMap TW_MakeFixedMap(const char **keys, void **key_slots, unsigned *values, int count);
 int TW_GetHashMapIndex(TwHashMap *map, const char *key, int len);
 
+// threading.c
 // TODO: General concurrent objects
 // TODO: General thread pool
+int TW_MultiThreadingEnabled(void);

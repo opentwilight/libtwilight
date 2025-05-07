@@ -85,48 +85,40 @@ _clear_bss:
 	cmpw 0, 4, 3
 	blt- _clear_bss
 
-	lis 4, _tw_irq_handler_template@ha
-	addi 4, 4, _tw_irq_handler_template@l
-	lis 5, _tw_irq_handler_template_end@ha
-	addi 5, 5, _tw_irq_handler_template_end@l
-	lis 6, 0x8000
-	addi 6, 6, 0x100
-	li 7, 0x16
+	lis 24, _tw_interrupt_handler_template@ha
+	addi 24, 24, _tw_interrupt_handler_template@l
+	lis 25, _tw_interrupt_handler_template_end@ha
+	addi 25, 25, _tw_interrupt_handler_template_end@l
+	lis 26, 0x8000
+	addi 26, 26, 0x100
+	li 27, 0x16
 
 _instantiate_irq_handlers_outer:
-	mr 3, 4
-	mr 8, 6
-	rlwinm 9, 6, 24, 8, 31 // shift right by 8 bits
+	mr 3, 24
+	mr 8, 26
+	rlwinm 9, 26, 24, 8, 31 // shift right by 8 bits
 	addis 9, 9, 0x37e0 // 0x3860 = 0x37e0 + (0x8000 >> 8)
-	addi 9, 9, -1 // 0x80000100 -> 0, 0x80000200 -> 1, 0x80000300 -> 2, etc.
+	addic 9, 9, -1 // 0x80000100 -> 0, 0x80000200 -> 1, 0x80000300 -> 2, etc.
 	stw 9, 0(8)
 _copy_irq_handler:
 	lwzu 9, 4(3)
 	stwu 9, 4(8)
-	cmpw 0, 3, 5
+	cmpw 0, 3, 25
 	blt+ _copy_irq_handler
-	li 8, 0
-_flush_irq_handler:
-	dcbf 0, 6
-	dcbt 0, 6
-	dcbst 0, 6
-	sync
-	icbi 0, 6
-	addi 6, 6, 0x20
-	addi 8, 8, 1
-	cmpwi 0, 8, 8
-	blt+ _flush_irq_handler
-	addi 7, 7, -1
-	cmpwi 0, 7, 0
+	mr 3, 26
+	li 4, 0x100
+	bl TW_FlushMemory
+	mr 26, 3
+	addic. 27, 27, -1
 	bge+ _instantiate_irq_handlers_outer
 
 	sync
-	mfmsr 3
-	ori 3, 3, 0x1000 // enable interrupts
-	mtmsr 3
-	sync
 
+	bl TW_EnableInterrupts
 	bl main
+
+	// TODO: do thread cleanup here (joining, etc)
+	// TODO: return to loader or power off
 	b .
 
 __toc_size:
@@ -134,30 +126,49 @@ __toc_size:
 __stack_size:
 	.long 0x30000
 
-__irq_call_scratch:
+.globl __tw_external_interrupt_handler_table
+__tw_external_interrupt_handler_table:
+	.long 0
+	.long 0
+	.long 0
+	.long 0
+	.long 0
+	.long 0
+	.long 0
+	.long 0
+	.long 0
+	.long 0
+	.long 0
+	.long 0
 	.long 0
 	.long 0
 	.long 0
 	.long 0
 
-_tw_irq_handler_template:
+__interrupt_call_scratch:
+	.long 0
+	.long 0
+	.long 0
+	.long 0
+
+_tw_interrupt_handler_template:
 	li 3, 0 // not copied, just here for readability
 
-	lis 4, __irq_call_scratch@ha
-	ori 4, 4, __irq_call_scratch@l
+	lis 4, __interrupt_call_scratch@ha
+	ori 4, 4, __interrupt_call_scratch@l
 	stw 0, 0(4)
 	stw 1, 4(4)
 	stw 2, 8(4)
 	mflr 5
 	stw 5, 12(4)
 
-	lis 5, _tw_irq_handler_impl@ha
-	ori 5, 5, _tw_irq_handler_impl@l
+	lis 5, _tw_interrupt_handler_impl@ha
+	ori 5, 5, _tw_interrupt_handler_impl@l
 	mtlr 5
 	blrl
 
-	lis 4, __irq_call_scratch@ha
-	ori 4, 4, __irq_call_scratch@l
+	lis 4, __interrupt_call_scratch@ha
+	ori 4, 4, __interrupt_call_scratch@l
 	lwz 0, 0(4)
 	lwz 1, 4(4)
 	lwz 2, 8(4)
@@ -166,5 +177,5 @@ _tw_irq_handler_template:
 
 	rfi
 
-_tw_irq_handler_template_end:
+_tw_interrupt_handler_template_end:
 	.long 0

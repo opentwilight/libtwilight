@@ -5,85 +5,110 @@
 #define TERMINAL_ROWS 30
 
 static int _initialized = 0;
+static char _padding[32];
+static int _changed = 0;
+static unsigned _frame_counter = 0;
+static unsigned _mode_flags = 0;
+
+static void vblank_handler() {
+	unsigned status = PEEK_U32(TW_VIDEO_REG_BASE + 0x30);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x30, status & 0x7fffFFFF);
+
+	if (_changed) {
+		int count = 2;
+		int line = (_mode_flags & 1) ? 296 : 246; // start at a later line if PAL50
+		line *= (1 + ((_mode_flags & 2) >> 1)); // double the line if progressive
+		TW_SetSerialPollInterval(line, count);
+		_changed = 0;
+	}
+
+	_frame_counter++;
+}
 
 static void init_video(TwVideo *params) {
 	unsigned width = 320;
 	unsigned height;
 	unsigned fb_addr = TW_GetFramebufferAddress((void*)0);
 
-	unsigned short dcr = PEEK_U16(VI_REG_BASE + 2);
+	unsigned short dcr = PEEK_U16(TW_VIDEO_REG_BASE + 2);
 	params->format = (dcr >> 8) & 3;
 	params->is_progressive = (dcr >> 2) & 1;
 
 	//POKE_U32(0xff000000 | dcr, 1);
 
 	//unsigned short dcr = ;
-	//POKE_U16(VI_REG_BASE + 2, (u16)(((params->format == 1) << 8) | 1));
+	//POKE_U16(TW_VIDEO_REG_BASE + 2, (u16)(((params->format == 1) << 8) | 1));
 
-	if (params->format == 1) {
-		//POKE_U32(VI_REG_BASE + 4, 0x4B6A01B0);
-		//POKE_U32(VI_REG_BASE + 8, 0x02F85640);
-		POKE_U32(VI_REG_BASE + 0xc, 0x00010023);
-		POKE_U32(VI_REG_BASE + 0x10, 0x00000024);
-		//POKE_U32(VI_REG_BASE + 0x14, 0x4D2B4D6D);
-		//POKE_U32(VI_REG_BASE + 0x18, 0x4D8A4D4C);
-		//POKE_U32(VI_REG_BASE + 0x30, 0x113901B1);
-		//POKE_U16(VI_REG_BASE + 0x2c, 0x013C);
-		//POKE_U16(VI_REG_BASE + 0x2e, 0x0144);
+	unsigned fb_reg_value = 0x10000000 | (fb_addr >> 5);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x1c, fb_reg_value);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x24, fb_reg_value);
+
+	if (params->format == TW_VIDEO_PAL50) {
+		POKE_U32(TW_VIDEO_REG_BASE + 4, 0x4B6A01B0);
+		POKE_U32(TW_VIDEO_REG_BASE + 8, 0x02F85640);
+		POKE_U32(TW_VIDEO_REG_BASE + 0xc, 0x00010023);
+		POKE_U32(TW_VIDEO_REG_BASE + 0x10, 0x00000024);
+		POKE_U32(TW_VIDEO_REG_BASE + 0x14, 0x4D2B4D6D);
+		POKE_U32(TW_VIDEO_REG_BASE + 0x18, 0x4D8A4D4C);
+		POKE_U32(TW_VIDEO_REG_BASE + 0x30, 0x113901B1);
+		//POKE_U16(TW_VIDEO_REG_BASE + 0x2c, 0x013C);
+		//POKE_U16(TW_VIDEO_REG_BASE + 0x2e, 0x0144);
 	} else {
-		//POKE_U32(VI_REG_BASE + 4, 0x476901AD);
-		//POKE_U32(VI_REG_BASE + 8, 0x02EA5140);
-		POKE_U32(VI_REG_BASE + 0xc, 0x00030018);
-		POKE_U32(VI_REG_BASE + 0x10, 0x00020019);
-		//POKE_U32(VI_REG_BASE + 0x14, 0x410C410C);
-		//POKE_U32(VI_REG_BASE + 0x18, 0x40ED40ED);
-		//POKE_U32(VI_REG_BASE + 0x30, 0x110701AE);
+		POKE_U32(TW_VIDEO_REG_BASE + 4, 0x476901AD);
+		POKE_U32(TW_VIDEO_REG_BASE + 8, 0x02EA5140);
+		POKE_U32(TW_VIDEO_REG_BASE + 0xc, 0x00030018);
+		POKE_U32(TW_VIDEO_REG_BASE + 0x10, 0x00020019);
+		POKE_U32(TW_VIDEO_REG_BASE + 0x14, 0x410C410C);
+		POKE_U32(TW_VIDEO_REG_BASE + 0x18, 0x40ED40ED);
+		POKE_U32(TW_VIDEO_REG_BASE + 0x30, 0x110701AE);
 		/*
 		if (params->is_progressive) {
-			POKE_U16(VI_REG_BASE + 0x2c, 0x0005);
-			POKE_U16(VI_REG_BASE + 0x2e, 0x0176);
+			POKE_U16(TW_VIDEO_REG_BASE + 0x2c, 0x0005);
+			POKE_U16(TW_VIDEO_REG_BASE + 0x2e, 0x0176);
 		}
 		else {
-			POKE_U16(VI_REG_BASE + 0x2c, 0x0000);
-			POKE_U16(VI_REG_BASE + 0x2e, 0x0000);
+			POKE_U16(TW_VIDEO_REG_BASE + 0x2c, 0x0000);
+			POKE_U16(TW_VIDEO_REG_BASE + 0x2e, 0x0000);
 		}
 		*/
 	}
 
-	unsigned fb_reg_value = 0x10000000 | (fb_addr >> 5);
-
-	POKE_U32(VI_REG_BASE + 0x1c, fb_reg_value);
-	//POKE_U32(VI_REG_BASE + 0x20, 0x00000000);
-	POKE_U32(VI_REG_BASE + 0x24, fb_reg_value);
 	/*
-	POKE_U32(VI_REG_BASE + 0x28, 0x00000000);
-	POKE_U32(VI_REG_BASE + 0x34, 0x10010001);
-	POKE_U32(VI_REG_BASE + 0x38, 0x10010001);
-	POKE_U32(VI_REG_BASE + 0x3c, 0x10010001);
-	POKE_U32(VI_REG_BASE + 0x40, 0x00000000);
-	POKE_U32(VI_REG_BASE + 0x44, 0x00000000);
-	POKE_U16(VI_REG_BASE + 0x48, 0x2850);
-	POKE_U16(VI_REG_BASE + 0x4a, 0x0100);
-	POKE_U32(VI_REG_BASE + 0x4c, 0x1AE771F0);
-	POKE_U32(VI_REG_BASE + 0x50, 0x0DB4A574);
-	POKE_U32(VI_REG_BASE + 0x54, 0x00C1188E);
-	POKE_U32(VI_REG_BASE + 0x58, 0xC4C0CBE2);
-	POKE_U32(VI_REG_BASE + 0x5C, 0xFCECDECF);
-	POKE_U32(VI_REG_BASE + 0x60, 0x13130F08);
-	POKE_U32(VI_REG_BASE + 0x64, 0x00080C0F);
-	POKE_U32(VI_REG_BASE + 0x68, 0x00FF0000);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x28, 0x00000000);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x34, 0x10010001);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x38, 0x10010001);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x3c, 0x10010001);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x40, 0x00000000);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x44, 0x00000000);
+	POKE_U16(TW_VIDEO_REG_BASE + 0x48, 0x2850);
+	POKE_U16(TW_VIDEO_REG_BASE + 0x4a, 0x0100);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x4c, 0x1AE771F0);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x50, 0x0DB4A574);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x54, 0x00C1188E);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x58, 0xC4C0CBE2);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x5C, 0xFCECDECF);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x60, 0x13130F08);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x64, 0x00080C0F);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x68, 0x00FF0000);
 	*/
-	POKE_U16(VI_REG_BASE + 0x6c, params->is_progressive);
+	POKE_U16(TW_VIDEO_REG_BASE + 0x6c, params->is_progressive);
 
 	/*
-	POKE_U16(VI_REG_BASE + 0x70, 0x0280);
-	POKE_U16(VI_REG_BASE + 0x72, 0x0000);
-	POKE_U16(VI_REG_BASE + 0x74, 0x0000);
+	POKE_U16(TW_VIDEO_REG_BASE + 0x70, 0x0280);
+	POKE_U16(TW_VIDEO_REG_BASE + 0x72, 0x0000);
+	POKE_U16(TW_VIDEO_REG_BASE + 0x74, 0x0000);
 	*/
+
+	TW_DisableInterrupts();
+	_mode_flags = (params->format == TW_VIDEO_PAL50) | (params->is_progressive << 1);
+	_frame_counter = 0;
+	_changed = 1;
+	TW_SetInterruptHandler(TW_INTERRUPT_BIT_VIDEO, vblank_handler);
+	TW_EnableInterrupts();
 
 	params->width = width;
 	params->height = height;
-	params->xfb = (unsigned*)fb_addr;
+	params->xfb = (unsigned*)(0x40000000 | fb_addr);
 }
 
 void TW_InitVideo(TwVideo *params) {
@@ -91,6 +116,24 @@ void TW_InitVideo(TwVideo *params) {
 	if (!_initialized) {
 		init_video(params);
 		_initialized = 1;
+	}
+}
+
+void TW_InvalidateVideoTiming() {
+	TW_DisableInterrupts();
+	_changed = 1;
+	TW_EnableInterrupts();
+}
+
+void TW_AwaitVideoVBlank(TwVideo *params) {
+	if (TW_MultiThreadingEnabled()) {
+		// try to yield if multithreading, and get woken up by the interrupt
+		// TODO
+	}
+	else {
+		// spin
+		unsigned cur_frame = _frame_counter;
+		while (PEEK_U32(&_frame_counter) == cur_frame);
 	}
 }
 
@@ -171,13 +214,6 @@ void TW_WriteTerminalAscii(TwTerminal *params, TwVideo *video, const char *chars
 					int bit_pos = idx * _glyph_size * 8 + j * _glyph_width + l;
 					int c = (_glyph_data[bit_pos >> 3] >> (6 - (bit_pos & 7))) & 3;
 					int offset = ((r * _glyph_height) + j) * 320 + (k1 * _glyph_width + l) / 2;
-					/*
-					*(volatile unsigned*)(
-						0xff000000 |
-						((unsigned)&_glyph_data[bit_pos >> 3] << 8) |
-						(_glyph_data[bit_pos >> 3] & 0xff)
-					) = c;
-					*/
 					video->xfb[offset] = colors[c];
 				}
 			}
