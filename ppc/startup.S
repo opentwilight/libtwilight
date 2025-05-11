@@ -2,16 +2,148 @@
 	.globl __toc_size
 	.globl __stack_size
 	.globl _finish_startup
-_start:
-	// disable interrupts
-	mfmsr 3
-	rlwinm 6, 3, 0, 17, 15 // clear the EE bit
-	mtmsr 6 // we'll leave the non-EE MSR in r6 for now
+
+_init_bats:
+	// initialize block address translations (BATs)
+	lis 7, 0x0011
+	ori 7, 7, 0x0c64
+	mtspr 1008, 7 // set HID0 (SPR 1008) to 0x00110c64 to disable icache and dcache
 	isync
 
-	// initialize block address translations (BATs)
-	// involves setting HID0 (SPR 1008) to 0x00110c64 to disable icache and dcache, then restoring them afterward with 0x0011cc64
-	// TODO
+	lis 3, 0x8000
+	mtsr 0, 3
+	mtsr 1, 3
+	mtsr 2, 3
+	mtsr 3, 3
+	mtsr 4, 3
+	mtsr 5, 3
+	mtsr 6, 3
+	mtsr 7, 3
+	mtsr 8, 3
+	mtsr 9, 3
+	mtsr 10, 3
+	mtsr 11, 3
+	mtsr 12, 3
+	mtsr 13, 3
+	mtsr 14, 3
+	mtsr 15, 3
+	isync
+
+	li 4, 0
+	mtspr 528, 4
+	mtspr 529, 4
+	mtspr 530, 4
+	mtspr 531, 4
+	mtspr 532, 4
+	mtspr 533, 4
+	mtspr 534, 4
+	mtspr 535, 4
+	mtspr 536, 4
+	mtspr 537, 4
+	mtspr 538, 4
+	mtspr 539, 4
+	mtspr 540, 4
+	mtspr 541, 4
+	mtspr 542, 4
+	mtspr 543, 4
+
+#if TW_WII
+	isync
+	lis 3, 0x8200
+	mtspr 1011, 3 // set HID4 (is it SPR 1011?) to 0x82 << 24 to enable HID4 access and BATs 5-8
+	isync
+
+	mtspr 544, 4
+	mtspr 545, 4
+	mtspr 546, 4
+	mtspr 547, 4
+	mtspr 548, 4
+	mtspr 549, 4
+	mtspr 550, 4
+	mtspr 551, 4
+	mtspr 552, 4
+	mtspr 553, 4
+	mtspr 554, 4
+	mtspr 555, 4
+	mtspr 556, 4
+	mtspr 557, 4
+	mtspr 558, 4
+	mtspr 559, 4
+	isync
+
+	// MEM2
+	// Set BAT4 U,L to 0x9000_1fff, 0x1000_0002 for instruction and data
+	lis 3, 0x9000
+	ori 3, 3, 0x1fff
+	lis 4, 0x1000
+	ori 4, 4, 2
+	mtspr 544, 3
+	mtspr 545, 4
+	mtspr 552, 3
+	mtspr 553, 4
+	isync
+
+	// Wii-specific MMIO
+	// Set BAT5 U,L to 0xd000_1fff, 0x1000_002a for data only
+	oris 3, 3, 0x4000
+	ori 4, 4, 0x28
+	mtspr 554, 3
+	mtspr 555, 4
+#endif
+
+	isync
+
+	// MEM1
+	// Set BAT0 U,L to 0x8000_1fff, 0x0000_0002 for instruction and data
+	lis 3, 0x8000
+	ori 3, 3, 0x1fff
+	li 4, 2
+	mtspr 528, 3
+	mtspr 529, 4
+	mtspr 536, 3
+	mtspr 537, 4
+	isync
+
+	// MMIO
+	// Set BAT1 U,L to 0xc000_1fff, 0x0000_002a for data only
+	oris 3, 3, 0x4000
+	ori 4, 4, 0x28
+	mtspr 538, 3
+	mtspr 539, 4
+	isync
+
+	// re-enable icache and dcache
+	mfspr 3, 1008 // (HID0)
+	ori 3, 3, 0xc000
+	mtspr 1008, 3
+	isync
+
+	mfmsr 3
+	ori 3, 3, 0x30 // enable BATs for instructions and data
+	mtsrr1 3
+	mflr 3 // Get our return address, should be just after "bl _init_bats_trampoline"
+	oris 3, 3, 0x8000 // now that BATs are enabled, we can start prefixing MEM1 addresses with bit 0 set
+	mtsrr0 3
+	rfi
+
+_init_bats_trampoline:
+	mtsrr0 3 // exception PC (_init_bats)
+	mtsrr1 4 // intended machine status
+	rfi // jump to _init_bats
+
+_start:
+	// disable interrupts, BATs
+	mfmsr 4
+	rlwinm 6, 4, 0, 17, 15 // clear the EE bit, leaving this version in r6
+	rlwinm 4, 6, 0, 28, 25 // disable BATs for instructions and data
+	mtmsr 6 // We want to disable BATs as we transition to the exception coming up in _init_bats_trampoline
+	isync
+
+	// initialize BATs. We use a "trampoline" of sorts so that we can save the return address using a bl instruction
+	lis 3, _init_bats@ha
+	rlwinm 3, 3, 0, 1, 31
+	addi 3, 3, _init_bats@l
+	bl _init_bats_trampoline
 
 	// initialize L2 cache
 	li 3, 0x30 // disable everything except BATs
@@ -94,12 +226,8 @@ _clear_bss:
 	li 27, 0x16
 
 _instantiate_irq_handlers_outer:
-	mr 3, 24
-	mr 8, 26
-	rlwinm 9, 26, 24, 8, 31 // shift right by 8 bits
-	addis 9, 9, 0x37e0 // 0x3860 = 0x37e0 + (0x8000 >> 8)
-	addic 9, 9, -1 // 0x80000100 -> 0, 0x80000200 -> 1, 0x80000300 -> 2, etc.
-	stw 9, 0(8)
+	addic 3, 24, -4
+	addic 8, 26, -4
 _copy_irq_handler:
 	lwzu 9, 4(3)
 	stwu 9, 4(8)
@@ -125,57 +253,3 @@ __toc_size:
 	.long 0x8000
 __stack_size:
 	.long 0x30000
-
-.globl __tw_external_interrupt_handler_table
-__tw_external_interrupt_handler_table:
-	.long 0
-	.long 0
-	.long 0
-	.long 0
-	.long 0
-	.long 0
-	.long 0
-	.long 0
-	.long 0
-	.long 0
-	.long 0
-	.long 0
-	.long 0
-	.long 0
-	.long 0
-	.long 0
-
-__interrupt_call_scratch:
-	.long 0
-	.long 0
-	.long 0
-	.long 0
-
-_tw_interrupt_handler_template:
-	li 3, 0 // not copied, just here for readability
-
-	lis 4, __interrupt_call_scratch@ha
-	ori 4, 4, __interrupt_call_scratch@l
-	stw 0, 0(4)
-	stw 1, 4(4)
-	stw 2, 8(4)
-	mflr 5
-	stw 5, 12(4)
-
-	lis 5, _tw_interrupt_handler_impl@ha
-	ori 5, 5, _tw_interrupt_handler_impl@l
-	mtlr 5
-	blrl
-
-	lis 4, __interrupt_call_scratch@ha
-	ori 4, 4, __interrupt_call_scratch@l
-	lwz 0, 0(4)
-	lwz 1, 4(4)
-	lwz 2, 8(4)
-	lwz 3, 12(4)
-	mtlr 3
-
-	rfi
-
-_tw_interrupt_handler_template_end:
-	.long 0

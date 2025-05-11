@@ -4,7 +4,9 @@
 
 #define POKE_SPR(nStr, valueVar) __asm("mtspr " nStr ", %0" : : "b"(valueVar))
 
+#if TW_WII
 #define TW_INTERRUPT_BIT_ACR       14
+#endif
 #define TW_INTERRUPT_BIT_HSP       13
 #define TW_INTERRUPT_BIT_DEBUG     12
 #define TW_INTERRUPT_BIT_FIFO      11
@@ -67,6 +69,7 @@ void TW_FreeGlobal(void *ptr);
 
 // video.c
 void TW_InitVideo(TwVideo *params);
+void TW_ClearVideoScreen(TwVideo *params, unsigned color);
 void TW_WriteTerminalAscii(TwTerminal *params, TwVideo *video, const char *chars, int len);
 
 // serial.c
@@ -74,7 +77,8 @@ void TW_SetSerialPollInterval(unsigned line, unsigned count);
 
 // interrupts.c
 void TW_SetTimerInterrupt(void (*handler)(), unsigned quadCycles);
-void TW_SetInterruptHandler(int interruptType, void (*handler)());
+void TW_SetCpuInterruptHandler(int interruptType, void (*handler)());
+void TW_SetExternalInterruptHandler(int interruptType, void (*handler)());
 
 // audio.c
 void TW_SetAudioInterrupts(void);

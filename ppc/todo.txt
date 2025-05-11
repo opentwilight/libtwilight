@@ -1,0 +1,6 @@
+TODO:
+	- hard reset AND soft reset
+	- IOS/IPC
+	- Advanced memory functionality (BATs, TLBs)
+	- Experiment with fetching something on DSI (page fault)
+	- GX

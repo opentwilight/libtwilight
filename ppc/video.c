@@ -103,7 +103,7 @@ static void init_video(TwVideo *params) {
 	_mode_flags = (params->format == TW_VIDEO_PAL50) | (params->is_progressive << 1);
 	_frame_counter = 0;
 	_changed = 1;
-	TW_SetInterruptHandler(TW_INTERRUPT_BIT_VIDEO, vblank_handler);
+	TW_SetExternalInterruptHandler(TW_INTERRUPT_BIT_VIDEO, vblank_handler);
 	TW_EnableInterrupts();
 
 	params->width = width;
@@ -135,6 +135,12 @@ void TW_AwaitVideoVBlank(TwVideo *params) {
 		unsigned cur_frame = _frame_counter;
 		while (PEEK_U32(&_frame_counter) == cur_frame);
 	}
+}
+
+void TW_ClearVideoScreen(TwVideo *params, unsigned color) {
+	unsigned *xfb = params->xfb;
+	for (int i = 0; i < 320 * 480; i++)
+		xfb[i] = color;
 }
 
 void TW_WriteTerminalAscii(TwTerminal *params, TwVideo *video, const char *chars, int len) {

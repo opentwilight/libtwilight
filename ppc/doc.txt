@@ -1,1 +1,0 @@
-TODO: Most code should go here, since most hardware features are accessed or commanded by the PowerPC on both Wii and GameCube.
