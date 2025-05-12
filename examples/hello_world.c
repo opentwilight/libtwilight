@@ -21,6 +21,7 @@ int main() {
 			TW_ClearVideoScreen(&video_params, term_params.back);
 			TW_WriteTerminalAscii(&term_params, &video_params, "hello", 5);
 		}
+		TW_AwaitVideoVBlank(&video_params);
 		counter++;
 	}
 

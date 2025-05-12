@@ -11,8 +11,10 @@ static unsigned _frame_counter = 0;
 static unsigned _mode_flags = 0;
 
 static void vblank_handler() {
-	unsigned status = PEEK_U32(TW_VIDEO_REG_BASE + 0x30);
-	POKE_U32(TW_VIDEO_REG_BASE + 0x30, status & 0x7fffFFFF);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x30, (PEEK_U32(TW_VIDEO_REG_BASE + 0x30)) & 0x7fffFFFF);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x34, (PEEK_U32(TW_VIDEO_REG_BASE + 0x34)) & 0x7fffFFFF);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x38, (PEEK_U32(TW_VIDEO_REG_BASE + 0x38)) & 0x7fffFFFF);
+	POKE_U32(TW_VIDEO_REG_BASE + 0x3c, (PEEK_U32(TW_VIDEO_REG_BASE + 0x3c)) & 0x7fffFFFF);
 
 	if (_changed) {
 		int count = 2;
@@ -39,7 +41,7 @@ static void init_video(TwVideo *params) {
 	//unsigned short dcr = ;
 	//POKE_U16(TW_VIDEO_REG_BASE + 2, (u16)(((params->format == 1) << 8) | 1));
 
-	unsigned fb_reg_value = 0x10000000 | (fb_addr >> 5);
+	unsigned fb_reg_value = fb_addr; // 0x10000000 | (fb_addr >> 5);
 	POKE_U32(TW_VIDEO_REG_BASE + 0x1c, fb_reg_value);
 	POKE_U32(TW_VIDEO_REG_BASE + 0x24, fb_reg_value);
 
@@ -108,7 +110,7 @@ static void init_video(TwVideo *params) {
 
 	params->width = width;
 	params->height = height;
-	params->xfb = (unsigned*)(0x40000000 | fb_addr);
+	params->xfb = (unsigned*)fb_addr;
 }
 
 void TW_InitVideo(TwVideo *params) {
@@ -139,8 +141,7 @@ void TW_AwaitVideoVBlank(TwVideo *params) {
 
 void TW_ClearVideoScreen(TwVideo *params, unsigned color) {
 	unsigned *xfb = params->xfb;
-	for (int i = 0; i < 320 * 480; i++)
-		xfb[i] = color;
+	TW_FillWordsAndFlush((unsigned*)params->xfb, color, 320 * 480);
 }
 
 void TW_WriteTerminalAscii(TwTerminal *params, TwVideo *video, const char *chars, int len) {
@@ -205,15 +206,13 @@ void TW_WriteTerminalAscii(TwTerminal *params, TwVideo *video, const char *chars
 			continue;
 		}
 		int r = line % TERMINAL_ROWS;
-		if (home_col != 0) {
-			for (int j = 0; j < _glyph_height; j++) {
+		for (int j = 0; j < _glyph_height; j++) {
+			if (home_col != 0) {
 				for (int k = 0; k < (home_col * _glyph_width) / 2; k++) {
 					video->xfb[((r * _glyph_height) + j) * 320 + k] = params->back;
 				}
 			}
-		}
-		// FIXME: this won't work for glyphs of an odd width
-		for (int j = 0; j < _glyph_height; j++) {
+			// FIXME: this won't work for glyphs of an odd width
 			for (int k1 = home_col, k2 = home; k1 < col; k1++, k2++) {
 				int idx = (chars[k2] >= 0x20 && chars[k2] <= 0x7e) ? (chars[k2] - 0x20) : 0;
 				for (int l = 0; l < _glyph_width; l += 2) {
@@ -223,13 +222,12 @@ void TW_WriteTerminalAscii(TwTerminal *params, TwVideo *video, const char *chars
 					video->xfb[offset] = colors[c];
 				}
 			}
-		}
-		if (col < TERMINAL_COLS - 1) {
-			for (int j = 0; j < _glyph_height; j++) {
+			if (col < TERMINAL_COLS - 1) {
 				for (int k = (col * _glyph_width) / 2; k < ((TERMINAL_COLS - 1) * _glyph_width) / 2; k++) {
 					video->xfb[((r * _glyph_height) + j) * 320 + k] = params->back;
 				}
 			}
+			TW_FlushMemory(&video->xfb[((r * _glyph_height) + j) * 320], 320 * 4);
 		}
 		if (chars[i] == '\n') {
 			col = 0;

@@ -32,9 +32,74 @@ _tw_flush_memory_loop:
 	bne+ _tw_flush_memory_loop
 	blr
 
+.globl TW_FillWordsAndFlush
+TW_FillWordsAndFlush:
+	rlwinm. 6, 3, 0, 27, 31
+	rlwinm 6, 5, 29, 3, 31
+	beq+ _tw_fill_words_sync_loop_bulk_start
+	stw 4, 0(3)
+	addi 3, 3, 4
+	addic 5, 5, -1
+	b TW_FillWordsAndFlush
+_tw_fill_words_sync_loop_bulk_start:
+	mr 24, 4
+	mr 25, 4
+	mr 26, 4
+	mr 27, 4
+	mr 28, 4
+	mr 29, 4
+	mr 30, 4
+	mr 31, 4
+	mr 7, 6
+	cmpwi 0, 5, 32
+	blt- _tw_fill_words_sync_loop_post
+_tw_fill_words_sync_loop_bulk:
+	dcbt 0, 3
+	stmw 24, 0(3)
+	dcbf 0, 3
+	dcbst 0, 3
+	sync
+	addi 3, 3, 0x20
+	addic. 6, 6, -1
+	bne+ _tw_fill_words_sync_loop_bulk
+	rlwinm 6, 7, 3, 0, 28
+	subf. 5, 5, 6
+_tw_fill_words_sync_loop_post:
+	blelr
+	stw 4, 0(3)
+	addi 3, 3, 4
+	addic. 5, 5, -1
+	b _tw_fill_words_sync_loop_post
+
+.globl TW_CountLeadingZeros
+TW_CountLeadingZeros:
+	cntlzw 3, 3
+	blr
+
+.globl TW_CountBits
+TW_CountBits:
+	li 5, 0
+_tw_count_bits_loop:
+	cntlzw 4, 3
+	addi 4, 4, 1
+	slw. 3, 3, 4
+	addi 5, 5, 1
+	beq- _tw_count_bits_loop
+	mr 3, 5
+	blr
+
+.globl TW_HasOneBitSet
+TW_HasOneBitSet:
+	cntlzw 4, 3
+	addi 4, 4, 1
+	slw 3, 3, 4
+	cntlzw 4, 3
+	rlwinm 3, 4, 28, 0, 31
+	blr
+
 .globl __tw_external_interrupt_handler_table
 __tw_external_interrupt_handler_table:
-	.fill 16, 4, 0
+	.fill 48, 4, 0
 
 .globl __tw_cpu_interrupt_handler_table
 __tw_cpu_interrupt_handler_table:

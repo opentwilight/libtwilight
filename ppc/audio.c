@@ -1,5 +1,5 @@
 #include "twilight_ppc.h"
 
-void TW_SetAudioInterrupts(void) {
+void TW_InitAudioInterrupts(void) {
 	
 }

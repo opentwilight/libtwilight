@@ -5,6 +5,24 @@
 #define POKE_SPR(nStr, valueVar) __asm("mtspr " nStr ", %0" : : "b"(valueVar))
 
 #if TW_WII
+#define TW_INTERRUPT_BIT_STARLET_TIMER (16 + 0)
+#define TW_INTERRUPT_BIT_NAND          (16 + 1)
+#define TW_INTERRUPT_BIT_AES           (16 + 2)
+#define TW_INTERRUPT_BIT_SHA1          (16 + 3)
+#define TW_INTERRUPT_BIT_USB_E         (16 + 4)
+#define TW_INTERRUPT_BIT_USB_O0        (16 + 5)
+#define TW_INTERRUPT_BIT_USB_O1        (16 + 6)
+#define TW_INTERRUPT_BIT_SD            (16 + 7)
+#define TW_INTERRUPT_BIT_WIFI          (16 + 8)
+#define TW_INTERRUPT_BIT_GPIO_BROADWAY (16 + 10)
+#define TW_INTERRUPT_BIT_GPIO_STARLET  (16 + 11)
+#define TW_INTERRUPT_BIT_MIOS          (16 + 15)
+#define TW_INTERRUPT_BIT_WRESET        (16 + 17)
+#define TW_INTERRUPT_BIT_WDVD          (16 + 18)
+#define TW_INTERRUPT_BIT_VWII          (16 + 19)
+#define TW_INTERRUPT_BIT_IPC_BROADWAY  (16 + 30)
+#define TW_INTERRUPT_BIT_IPC_STARLET   (16 + 31)
+
 #define TW_INTERRUPT_BIT_ACR       14
 #endif
 #define TW_INTERRUPT_BIT_HSP       13
@@ -34,6 +52,7 @@
 
 #if TW_WII
 #define TW_SERIAL_REG_BASE  0xCD006400
+#define TW_IRQ_WII_REG_BASE 0xD0000030
 #else
 #define TW_SERIAL_REG_BASE  0xCC006400
 #endif
@@ -69,6 +88,7 @@ void TW_FreeGlobal(void *ptr);
 
 // video.c
 void TW_InitVideo(TwVideo *params);
+void TW_AwaitVideoVBlank(TwVideo *params);
 void TW_ClearVideoScreen(TwVideo *params, unsigned color);
 void TW_WriteTerminalAscii(TwTerminal *params, TwVideo *video, const char *chars, int len);
 
@@ -81,13 +101,13 @@ void TW_SetCpuInterruptHandler(int interruptType, void (*handler)());
 void TW_SetExternalInterruptHandler(int interruptType, void (*handler)());
 
 // audio.c
-void TW_SetAudioInterrupts(void);
+void TW_InitAudioInterrupts(void);
 
 // dsp.c
-void TW_SetDspInterrupts(void);
+void TW_InitDspInterrupts(void);
 
 // exi.c
-void TW_SetExiInterrupts(void);
+void TW_InitExiInterrupts(void);
 
 // TODO: PPC-specific spinlocks, parking, atomics, threads
 // threading_ppc.c
@@ -97,3 +117,7 @@ void TW_SetExiInterrupts(void);
 extern unsigned TW_EnableInterrupts(void);
 extern unsigned TW_DisableInterrupts(void);
 extern void *TW_FlushMemory(void *ptr, int size);
+extern void *TW_FillWordsAndFlush(void *ptr, unsigned value, int words);
+extern unsigned TW_CountLeadingZeros(unsigned value);
+extern int TW_CountBits(unsigned value);
+extern int TW_HasOneBitSet(unsigned value);
