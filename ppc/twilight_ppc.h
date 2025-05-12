@@ -80,6 +80,14 @@ typedef struct {
 	int disable_wrap;
 } TwTerminal;
 
+typedef struct {
+	const unsigned char *data;
+	int width;
+	int height;
+	int bytes_per_glyph;
+	int count;
+} TwTermFont;
+
 // twilight.c
 void TW_InitTwilight(void);
 unsigned TW_GetFramebufferAddress(int *outSize);
@@ -90,6 +98,7 @@ void TW_FreeGlobal(void *ptr);
 void TW_InitVideo(TwVideo *params);
 void TW_AwaitVideoVBlank(TwVideo *params);
 void TW_ClearVideoScreen(TwVideo *params, unsigned color);
+void TW_DrawAsciiSpan(TwVideo *video, TwTermFont *font, unsigned back, unsigned fore, int x, int y, const char *str, int count);
 void TW_WriteTerminalAscii(TwTerminal *params, TwVideo *video, const char *chars, int len);
 
 // serial.c

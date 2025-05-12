@@ -1,6 +1,7 @@
 #include <twilight_ppc.h>
 
 typedef unsigned int u32;
+#define NULL (void*)0
 
 int main() {
 	TwVideo video_params;
@@ -16,11 +17,10 @@ int main() {
 
 	u32 counter = 0;
 	while (1) {
-		if ((counter % 30) == 0) {
-			term_params.row = 3 + (counter & 7);
-			TW_ClearVideoScreen(&video_params, term_params.back);
-			TW_WriteTerminalAscii(&term_params, &video_params, "hello", 5);
-		}
+		int x = -20 + (int)(counter & 0x7f); // -20 + ((int)(counter >> 1) % 120);
+		int y = -30 + (int)((counter >> 1) & 0xff); // 80 + ((int)(counter >> 3) % 60);
+		TW_ClearVideoScreen(&video_params, 0x00800080);
+		TW_DrawAsciiSpan(&video_params, NULL, 0x00800080, 0xff80ff80, x, y, "hello", 5);
 		TW_AwaitVideoVBlank(&video_params);
 		counter++;
 	}

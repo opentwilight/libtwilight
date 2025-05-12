@@ -5,6 +5,7 @@
 #define TERMINAL_ROWS 30
 
 static int _initialized = 0;
+static TwTermFont _default_font;
 static char _padding[32];
 static int _changed = 0;
 static unsigned _frame_counter = 0;
@@ -28,6 +29,14 @@ static void vblank_handler() {
 }
 
 static void init_video(TwVideo *params) {
+	_default_font = (TwTermFont) {
+		.data = &_glyph_data[0],
+		.width = _glyph_width,
+		.height = _glyph_height,
+		.bytes_per_glyph = _glyph_size,
+		.count = _glyph_count
+	};
+
 	unsigned short dcr = PEEK_U16(TW_VIDEO_REG_BASE + 2);
 	params->format = (dcr >> 8) & 3;
 	params->is_progressive = (dcr >> 2) & 1;
@@ -143,13 +152,66 @@ void TW_ClearVideoScreen(TwVideo *params, unsigned color) {
 	TW_FillWordsAndFlush((unsigned*)params->xfb, color, 320 * 480);
 }
 
+void TW_DrawAsciiSpan(TwVideo *video, TwTermFont *font, unsigned back, unsigned fore, int x, int y, const char *str, int count) {
+	if (!font)
+		font = &_default_font;
+
+	int halfw = (font->width / 2);
+	int w = count * halfw;
+	int h = font->height;
+	int x_off = 0;
+	int y_off = 0;
+	if (x < 0) {
+		x_off = -x;
+		x = 0;
+		w -= x_off;
+	}
+	if (y < 0) {
+		y_off = -y;
+		y = 0;
+		h -= y_off;
+	}
+	if (x + w > 320) {
+		w = 320 - x;
+	}
+	if (y + h > 480) {
+		h = 480 - y;
+	}
+
+	if (w <= 0 || h <= 0) {
+		return;
+	}
+
+	unsigned blended = ((back >> 1) & 0x7f7f7f7f) + ((fore >> 1) & 0x7f7f7f7f);
+	unsigned colors[4];
+	colors[0] = back;
+	colors[1] = blended;
+	colors[2] = blended;
+	colors[3] = fore;
+
+	for (int i = 0; i < h; i++) {
+		// FIXME: this won't work for glyphs of an odd width
+		for (int j = 0; j < w; j++) {
+			char ch = str[(j + x_off) / halfw];
+			int idx = ch < 0x20 || ch > 0x7e ? 0 : ((int)ch - 0x20);
+			int bit_pos = idx * font->bytes_per_glyph * 8 + ((i + y_off) * halfw + ((j + x_off) % halfw)) * 2;
+			int c = (font->data[bit_pos >> 3] >> (6 - (bit_pos & 7))) & 3;
+			int offset = (i + y) * 320 + j + x;
+			video->xfb[offset] = colors[c];
+		}
+		TW_FlushMemory(&video->xfb[(i + y) * 320 + x], w * 4);
+	}
+}
+
 void TW_WriteTerminalAscii(TwTerminal *params, TwVideo *video, const char *chars, int len) {
 	int text_offsets[TERMINAL_ROWS];
 	for (int i = 0; i < TERMINAL_ROWS; i++)
 		text_offsets[i] = 0;
 
-	int line_origin, line = params->row;
-	int col_origin, col = params->column;
+	int line_origin = params->row;
+	int col_origin = params->column;
+	int line = line_origin;
+	int col = col_origin;
 	int limit = len;
 
 	for (int i = 0; i < len; i++) {
@@ -189,13 +251,6 @@ void TW_WriteTerminalAscii(TwTerminal *params, TwVideo *video, const char *chars
 
 	//*(volatile unsigned*)(0xff000000 | (line << 12) | limit) = 3;
 
-	unsigned blended = ((params->back >> 1) & 0x7f7f7f7f) + ((params->fore >> 1) & 0x7f7f7f7f);
-	unsigned colors[4];
-	colors[0] = params->back;
-	colors[1] = blended;
-	colors[2] = blended;
-	colors[3] = params->fore;
-
 	//*(volatile unsigned*)(0xff000000 | (unsigned)&_glyph_data[0]) = 2;
 
 	for (int i = start; i < limit; i++) {
@@ -205,29 +260,9 @@ void TW_WriteTerminalAscii(TwTerminal *params, TwVideo *video, const char *chars
 			continue;
 		}
 		int r = line % TERMINAL_ROWS;
-		for (int j = 0; j < _glyph_height; j++) {
-			if (home_col != 0) {
-				for (int k = 0; k < (home_col * _glyph_width) / 2; k++) {
-					video->xfb[((r * _glyph_height) + j) * 320 + k] = params->back;
-				}
-			}
-			// FIXME: this won't work for glyphs of an odd width
-			for (int k1 = home_col, k2 = home; k1 < col; k1++, k2++) {
-				int idx = (chars[k2] >= 0x20 && chars[k2] <= 0x7e) ? (chars[k2] - 0x20) : 0;
-				for (int l = 0; l < _glyph_width; l += 2) {
-					int bit_pos = idx * _glyph_size * 8 + j * _glyph_width + l;
-					int c = (_glyph_data[bit_pos >> 3] >> (6 - (bit_pos & 7))) & 3;
-					int offset = ((r * _glyph_height) + j) * 320 + (k1 * _glyph_width + l) / 2;
-					video->xfb[offset] = colors[c];
-				}
-			}
-			if (col < TERMINAL_COLS - 1) {
-				for (int k = (col * _glyph_width) / 2; k < ((TERMINAL_COLS - 1) * _glyph_width) / 2; k++) {
-					video->xfb[((r * _glyph_height) + j) * 320 + k] = params->back;
-				}
-			}
-			TW_FlushMemory(&video->xfb[((r * _glyph_height) + j) * 320], 320 * 4);
-		}
+
+		TW_DrawAsciiSpan(video, &_default_font, params->back, params->fore, col * _glyph_width, r * _glyph_height, &chars[home], i - home);
+
 		if (chars[i] == '\n') {
 			col = 0;
 			home = i+1;
