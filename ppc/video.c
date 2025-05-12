@@ -28,18 +28,17 @@ static void vblank_handler() {
 }
 
 static void init_video(TwVideo *params) {
-	unsigned width = 320;
-	unsigned height;
-	unsigned fb_addr = TW_GetFramebufferAddress((void*)0);
-
 	unsigned short dcr = PEEK_U16(TW_VIDEO_REG_BASE + 2);
 	params->format = (dcr >> 8) & 3;
 	params->is_progressive = (dcr >> 2) & 1;
 
-	//POKE_U32(0xff000000 | dcr, 1);
+	unsigned width = 320;
+	unsigned height = params->format == TW_VIDEO_PAL50 ? 574 : 480;
+	unsigned fb_addr = TW_GetFramebufferAddress((void*)0);
 
-	//unsigned short dcr = ;
-	//POKE_U16(TW_VIDEO_REG_BASE + 2, (u16)(((params->format == 1) << 8) | 1));
+	unsigned short vtr = ((height >> 1) << 4) | (6 - (params->format == TW_VIDEO_PAL50));
+
+	POKE_U32(TW_VIDEO_REG_BASE + 0, ((unsigned int)vtr << 16) | (unsigned int)dcr);
 
 	unsigned fb_reg_value = fb_addr; // 0x10000000 | (fb_addr >> 5);
 	POKE_U32(TW_VIDEO_REG_BASE + 0x1c, fb_reg_value);
