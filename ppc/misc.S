@@ -71,6 +71,34 @@ _tw_fill_words_sync_loop_post:
 	addic. 5, 5, -1
 	b _tw_fill_words_sync_loop_post
 
+.globl TW_CopyBytes
+TW_CopyBytes:
+	subf. 6, 3, 4
+	beqlr
+	blt _tw_copy_bytes_forward
+	cmpw 0, 6, 5
+	bge _tw_copy_bytes_forward
+	mr 7, 3
+	add 3, 3, 5
+	add 4, 4, 5
+_tw_copy_bytes_backward_loop:
+	lbzu 6, -1(3)
+	stbu 6, -1(4)
+	cmpw 0, 3, 7
+	bgt _tw_copy_bytes_backward_loop
+	add 3, 7, 5
+	blr
+_tw_copy_bytes_forward:
+	add 7, 3, 5
+	addic 3, 3, -1
+	addic 4, 4, -1
+_tw_copy_bytes_forward_loop:
+	lbzu 6, 1(3)
+	stbu 6, 1(4)
+	cmpw 0, 3, 7
+	blt _tw_copy_bytes_forward_loop
+	blr
+
 .globl TW_CountLeadingZeros
 TW_CountLeadingZeros:
 	cntlzw 3, 3

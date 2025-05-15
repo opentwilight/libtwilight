@@ -249,10 +249,6 @@ void TW_WriteTerminalAscii(TwTerminal *params, TwVideo *video, const char *chars
 	int home = start;
 	int home_col = col_origin;
 
-	//*(volatile unsigned*)(0xff000000 | (line << 12) | limit) = 3;
-
-	//*(volatile unsigned*)(0xff000000 | (unsigned)&_glyph_data[0]) = 2;
-
 	for (int i = start; i < limit; i++) {
 		int is_newline = chars[i] == '\n' || (!params->disable_wrap && col >= TERMINAL_COLS - 1);
 		if (i < limit-1 && !is_newline) {

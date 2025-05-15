@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdarg.h>
+
 #define PEEK_U16(address) *(volatile unsigned short*)(address)
 #define PEEK_U32(address) *(volatile unsigned int*)(address)
 
@@ -22,7 +24,15 @@ typedef struct {
 	TwHeapBlockHeader *last;
 } TwHeapAllocator;
 
+struct tw_stream {
+	void *parent;
+	int (*transfer)(struct tw_stream *stream, char *data, int size);
+};
+typedef struct tw_stream TwStream;
+
 typedef struct {
+	TwStream stream;
+	TwHeapAllocator *alloc;
 	int capacity;
 	int size;
 	char *data;
@@ -35,15 +45,34 @@ typedef struct {
 	unsigned *values;
 } TwHashMap;
 
+// These must be defined in the architecture implementation, ie. ppc or arm
+extern void *TW_CopyBytes(void *dst, const void *src, int len);
+void *TW_AllocateGlobal(int count, int elemSize);
+void *TW_ReallocateGlobal(void *ptr, int count, int elemSize);
+void TW_FreeGlobal(void *ptr);
+
 // structures.c
 // NOT thread-safe -- many of these functions should be locked on the outside in a concurrent context
+
 TwHeapAllocator TW_MakeHeap(void *startAddress, void *endAddress);
 int TW_CalcHeapObjectInnerSize(int count, int elemSize);
+int TW_RetrieveHeapObjectInnerSize(TwHeapAllocator *alloc, void *ptr);
+void TW_UpdateHeapObjectSize(TwHeapAllocator *alloc, void *ptr, int newSize);
+int TW_GetSpaceUntilNextOccupiedHeapObject(TwHeapAllocator *alloc, void *ptr);
 void *TW_AllocateHeapObject(TwHeapAllocator *alloc, int count, int elemSize);
+void *TW_ReallocateHeapObject(TwHeapAllocator *alloc, void *ptr, int count, int elemSize);
 void TW_FreeHeapObject(TwHeapAllocator *alloc, void *ptr);
+
+TwFlexArray TW_MakeFlexArray(TwHeapAllocator *alloc, int initialCapacity);
+int TW_AppendFlexArray(TwFlexArray *array, char *data, int size);
+int TW_ResizeFlexArray(TwFlexArray *array, int newSize);
+
 unsigned TW_GetStringHash(const char *str, int len);
 TwHashMap TW_MakeFixedMap(const char **keys, void **key_slots, unsigned *values, int count);
 int TW_GetHashMapIndex(TwHashMap *map, const char *key, int len);
+
+// strformat.c
+int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...);
 
 // threading.c
 // TODO: General concurrent objects

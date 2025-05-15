@@ -91,8 +91,6 @@ typedef struct {
 // twilight.c
 void TW_InitTwilight(void);
 unsigned TW_GetFramebufferAddress(int *outSize);
-void *TW_AllocateGlobal(int count, int elemSize);
-void TW_FreeGlobal(void *ptr);
 
 // video.c
 void TW_InitVideo(TwVideo *params);

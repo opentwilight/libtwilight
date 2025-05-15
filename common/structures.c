@@ -52,9 +52,123 @@ void *TW_AllocateHeapObject(TwHeapAllocator *alloc, int count, int elemSize) {
 	return (void*)start;
 }
 
+void *TW_ReallocateHeapObject(TwHeapAllocator *alloc, void *ptr, int count, int elemSize) {
+	int cur_size = TW_RetrieveHeapObjectInnerSize(alloc, ptr);
+	int new_size = TW_CalcHeapObjectInnerSize(count, elemSize);
+	if (new_size <= cur_size) {
+		TW_UpdateHeapObjectSize(alloc, ptr, new_size);
+		return ptr;
+	}
+
+	int space_until_next = TW_GetSpaceUntilNextOccupiedHeapObject(alloc, ptr);
+	if (space_until_next < 0 || new_size < space_until_next) {
+		TW_UpdateHeapObjectSize(alloc, ptr, new_size);
+		return ptr;
+	}
+
+	void *new_ptr = TW_AllocateHeapObject(alloc, count, elemSize);
+	if (!new_ptr)
+		return (void*)0;
+
+	TW_CopyBytes(new_ptr, ptr, cur_size);
+	TW_FreeHeapObject(alloc, ptr);
+	return new_ptr;
+}
+
 void TW_FreeHeapObject(TwHeapAllocator *alloc, void *ptr) {
 	TwHeapBlockHeader *obj = &((TwHeapBlockHeader*)ptr)[-1];
 	obj->prev = (void*)((unsigned)obj->prev | 1U);
+}
+
+// TODO !!!
+
+int TW_RetrieveHeapObjectInnerSize(TwHeapAllocator *alloc, void *ptr) {
+	return 0;
+}
+
+void TW_UpdateHeapObjectSize(TwHeapAllocator *alloc, void *ptr, int newSize) {
+
+}
+
+int TW_GetSpaceUntilNextOccupiedHeapObject(TwHeapAllocator *alloc, void *ptr) {
+	return 0;
+}
+
+static int _tw_write_flex_array(TwStream *stream, char *data, int size) {
+	return TW_AppendFlexArray((TwFlexArray*)stream->parent, data, size);
+}
+
+TwFlexArray TW_MakeFlexArray(TwHeapAllocator *alloc, int initialCapacity) {
+	int capacity = 0;
+	char *ptr = (void*)0;
+	if (initialCapacity > 0) {
+		capacity = initialCapacity;
+		if (alloc)
+			ptr = TW_AllocateHeapObject(alloc, capacity, 1);
+		else
+			ptr = TW_AllocateGlobal(capacity, 1);
+	}
+	TwFlexArray array = (TwFlexArray) {
+		.alloc = alloc,
+		.capacity = capacity,
+		.size = 0,
+		.data = ptr
+	};
+	array.stream = (TwStream) {
+		.parent = &array,
+		.transfer = _tw_write_flex_array
+	};
+	return array;
+}
+
+int TW_AppendFlexArray(TwFlexArray *array, char *data, int size) {
+	int pos = array->size;
+	if (size <= 0)
+		return pos;
+
+	int new_size = TW_ResizeFlexArray(array, pos + size);
+	if (new_size != pos + size)
+		return new_size;
+
+	TW_CopyBytes(&array->data[pos], data, size);
+	return new_size;
+}
+
+int TW_ResizeFlexArray(TwFlexArray *array, int newSize) {
+	if (newSize <= array->size) {
+		if (newSize < 0)
+			newSize = 0;
+		return newSize;
+	}
+
+	int new_cap = array->capacity;
+	if (new_cap < 64)
+		new_cap = 64;
+	while (newSize > new_cap)
+		new_cap = ((new_cap + 1) << 4) / 10;
+
+	if (new_cap > array->capacity) {
+		if (array->data) {
+			if (array->alloc)
+				array->data = TW_ReallocateHeapObject(array->alloc, array->data, newSize, 1);
+			else
+				array->data = TW_ReallocateGlobal(array->data, newSize, 1);
+		}
+		else {
+			if (array->alloc)
+				array->data = TW_AllocateHeapObject(array->alloc, newSize, 1);
+			else
+				array->data = TW_AllocateGlobal(newSize, 1);
+		}
+		// allocation failure
+		if (!array->data) {
+			return -1;
+		}
+		array->capacity = new_cap;
+	}
+
+	array->size = newSize;
+	return newSize;
 }
 
 // just a dumb hash for now
@@ -67,21 +181,21 @@ unsigned TW_GetStringHash(const char *str, int len) {
 	return hash;
 }
 
-TwHashMap TW_MakeFixedMap(const char **keys, void **key_slots, unsigned *values, int count) {
+TwHashMap TW_MakeFixedMap(const char **keys, void **keySlots, unsigned *values, int count) {
 	TwHashMap map = (TwHashMap) {
 		.capacity = count,
 		.used = count,
-		.keys = key_slots,
+		.keys = keySlots,
 		.values = values
 	};
 
 	for (int i = 0; i < count; i++)
-		key_slots[i] = (void*)0;
+		keySlots[i] = (void*)0;
 
 	for (int i = 0; i < count; i++) {
 		int idx = (int)(TW_GetStringHash(keys[i], 0) & 0x7FFFffffU) % count;
 		for (int j = 0; j < count; j++) {
-			void **slot = &key_slots[(idx+j) % count];
+			void **slot = &keySlots[(idx+j) % count];
 			if (*slot == (void*)0) {
 				*slot = (void*)keys[i];
 				break;
