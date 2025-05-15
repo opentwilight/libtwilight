@@ -4,9 +4,17 @@ This is an open source, clean slate implementation of a micro kernel for Wii/GC 
 
 The goal of this library is to provide a suitable foundation for writing high-perfomance games and apps that take full advantage of the hardware.
 
-It is not trying to be a full-on POSIX-compatible kernel. That said, it would be pretty cool if it were used as the foundation of such a kernel.
+It is not trying to be a full-on POSIX-compatible kernel.
 
 Currently in early stages. Text output to XFB using a monospace bitmap font is working, and is successfully displayed to the screen.
+
+## Setup
+
+Install LLVM and Clang.
+
+## Compile
+
+`clang -target powerpc-eabi -m32 -nostdlib -Ippc -DTW_WII=0 -Wl,-Tppc/sections.ld ppc/*.S ppc/*.c common/*.c examples/hello_world.c -o examples/hello_world.elf`
 
 ## Immediate TODO
 
@@ -31,6 +39,7 @@ Currently in early stages. Text output to XFB using a monospace bitmap font is w
 	- TLB
 	- BAT
 	- Interface for using the MMU effectively (probably not POSIX)
+	- Page faults in ISI/DSI exception handler
 - TCP/IP Stack
 - Maths
 - GC hardware
