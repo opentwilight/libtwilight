@@ -121,8 +121,6 @@ void TW_InitExiInterrupts(void);
 // Timer interrupt configurable via DEC register (SPR 22)
 
 // misc.S
-extern unsigned TW_EnableInterrupts(void);
-extern unsigned TW_DisableInterrupts(void);
 extern void *TW_FlushMemory(void *ptr, int size);
 extern void *TW_FillWordsAndFlush(void *ptr, unsigned value, int words);
 extern unsigned TW_CountLeadingZeros(unsigned value);

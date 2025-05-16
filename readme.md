@@ -18,7 +18,6 @@ Install LLVM and Clang.
 
 ## Immediate TODO
 
-- Complete the font!
 - Finish printf() building blocks
 	- String formatter
 	- XFB terminal printing (including ANSI escape codes)

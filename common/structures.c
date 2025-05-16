@@ -1,6 +1,12 @@
 #include "twilight_common.h"
 
-// NOT thread-safe: many of these functions should be locked on the outside in a concurrent context
+#define BEGIN_ALLOCATOR_METHOD() \
+	if (!alloc) { \
+		alloc = TW_GetGlobalAllocator(); \
+	} \
+	TW_LockMutex(&alloc->mutex)
+
+#define END_ALLOCATOR_METHOD() TW_UnlockMutex(&alloc->mutex)
 
 TwHeapAllocator TW_MakeHeap(void *startAddress, void *endAddress) {
 	int capacity = endAddress - startAddress;
@@ -32,7 +38,7 @@ int TW_CalcHeapObjectInnerSize(int count, int elemSize) {
 // TODO: Look at previous heap entries for until there's enough space for the new entry,
 //        but look past the first free entry in case there's contiguous free blocks that take up enough space together
 
-void *TW_AllocateHeapObject(TwHeapAllocator *alloc, int count, int elemSize) {
+static void *_tw_allocate_heap_object_inner(TwHeapAllocator *alloc, int count, int elemSize) {
 	int size = TW_CalcHeapObjectInnerSize(count, elemSize);
 	if (size <= 0)
 		return (void*)0;
@@ -52,7 +58,28 @@ void *TW_AllocateHeapObject(TwHeapAllocator *alloc, int count, int elemSize) {
 	return (void*)start;
 }
 
-void *TW_ReallocateHeapObject(TwHeapAllocator *alloc, void *ptr, int count, int elemSize) {
+static void *_tw_allocate_heap_object(TwHeapAllocator *alloc, int count, int elemSize) {
+	while (alloc) {
+		void *ptr = _tw_allocate_heap_object_inner(alloc, count, elemSize);
+		if (ptr)
+			return ptr;
+		alloc = alloc->next;
+	}
+	return (void*)0;
+}
+
+static void _tw_free_heap_object(TwHeapAllocator *alloc, void *ptr) {
+	while (alloc) {
+		if (ptr >= alloc->startAddr && ptr < (void*)((char*)alloc->startAddr + alloc->capacity)) {
+			TwHeapBlockHeader *obj = &((TwHeapBlockHeader*)ptr)[-1];
+			obj->prev = (void*)((unsigned)obj->prev | 1U);
+			break;
+		}
+		alloc = alloc->next;
+	}
+}
+
+static void *_tw_reallocate_heap_object(TwHeapAllocator *alloc, void *ptr, int count, int elemSize) {
 	int cur_size = TW_RetrieveHeapObjectInnerSize(alloc, ptr);
 	int new_size = TW_CalcHeapObjectInnerSize(count, elemSize);
 	if (new_size <= cur_size) {
@@ -66,18 +93,47 @@ void *TW_ReallocateHeapObject(TwHeapAllocator *alloc, void *ptr, int count, int 
 		return ptr;
 	}
 
-	void *new_ptr = TW_AllocateHeapObject(alloc, count, elemSize);
+	void *new_ptr = _tw_allocate_heap_object(alloc, count, elemSize);
 	if (!new_ptr)
 		return (void*)0;
 
 	TW_CopyBytes(new_ptr, ptr, cur_size);
-	TW_FreeHeapObject(alloc, ptr);
+	_tw_free_heap_object(alloc, ptr);
+	return new_ptr;
+}
+
+void *TW_AllocateHeapObject(TwHeapAllocator *alloc, int count, int elemSize) {
+	BEGIN_ALLOCATOR_METHOD();
+	void *ptr = _tw_allocate_heap_object(alloc, count, elemSize);
+	END_ALLOCATOR_METHOD();
+	return ptr;
+}
+
+void *TW_ReallocateHeapObject(TwHeapAllocator *alloc, void *ptr, int count, int elemSize) {
+	BEGIN_ALLOCATOR_METHOD();
+	void *new_ptr = _tw_reallocate_heap_object(alloc, ptr, count, elemSize);
+	END_ALLOCATOR_METHOD();
 	return new_ptr;
 }
 
 void TW_FreeHeapObject(TwHeapAllocator *alloc, void *ptr) {
-	TwHeapBlockHeader *obj = &((TwHeapBlockHeader*)ptr)[-1];
-	obj->prev = (void*)((unsigned)obj->prev | 1U);
+	BEGIN_ALLOCATOR_METHOD();
+	_tw_free_heap_object(alloc, ptr);
+	END_ALLOCATOR_METHOD();
+}
+
+void *TW_Allocate(TwHeapAllocator *alloc, void *ptr, int count, int elemSize) {
+	if (!alloc)
+		alloc = TW_GetGlobalAllocator();
+	if (ptr)
+		return TW_ReallocateHeapObject(alloc, ptr, count, elemSize);
+	return TW_AllocateHeapObject(alloc, count, elemSize);
+}
+
+void TW_Free(TwHeapAllocator *alloc, void *ptr) {
+	if (!alloc)
+		alloc = TW_GetGlobalAllocator();
+	TW_FreeHeapObject(alloc, ptr);
 }
 
 // TODO !!!
@@ -103,10 +159,7 @@ TwFlexArray TW_MakeFlexArray(TwHeapAllocator *alloc, int initialCapacity) {
 	char *ptr = (void*)0;
 	if (initialCapacity > 0) {
 		capacity = initialCapacity;
-		if (alloc)
-			ptr = TW_AllocateHeapObject(alloc, capacity, 1);
-		else
-			ptr = TW_AllocateGlobal(capacity, 1);
+		ptr = TW_AllocateHeapObject(alloc, capacity, 1);
 	}
 	TwFlexArray array = (TwFlexArray) {
 		.alloc = alloc,
@@ -148,18 +201,7 @@ int TW_ResizeFlexArray(TwFlexArray *array, int newSize) {
 		new_cap = ((new_cap + 1) << 4) / 10;
 
 	if (new_cap > array->capacity) {
-		if (array->data) {
-			if (array->alloc)
-				array->data = TW_ReallocateHeapObject(array->alloc, array->data, newSize, 1);
-			else
-				array->data = TW_ReallocateGlobal(array->data, newSize, 1);
-		}
-		else {
-			if (array->alloc)
-				array->data = TW_AllocateHeapObject(array->alloc, newSize, 1);
-			else
-				array->data = TW_AllocateGlobal(newSize, 1);
-		}
+		array->data = TW_Allocate(array->alloc, array->data, newSize, 1);
 		// allocation failure
 		if (!array->data) {
 			return -1;

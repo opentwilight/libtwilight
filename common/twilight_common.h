@@ -2,6 +2,8 @@
 
 #include <stdarg.h>
 
+#define MAX_HEAP_RANGES 4
+
 #define PEEK_U16(address) *(volatile unsigned short*)(address)
 #define PEEK_U32(address) *(volatile unsigned int*)(address)
 
@@ -17,12 +19,15 @@ struct tw_heap_block {
 };
 typedef struct tw_heap_block TwHeapBlockHeader;
 
-typedef struct {
+struct tw_heap_allocator {
+	void *mutex;
 	int capacity;
 	void *startAddr;
 	TwHeapBlockHeader *first;
 	TwHeapBlockHeader *last;
-} TwHeapAllocator;
+	struct tw_heap_allocator *next;
+};
+typedef struct tw_heap_allocator TwHeapAllocator;
 
 struct tw_stream {
 	void *parent;
@@ -47,9 +52,9 @@ typedef struct {
 
 // These must be defined in the architecture implementation, ie. ppc or arm
 extern void *TW_CopyBytes(void *dst, const void *src, int len);
-void *TW_AllocateGlobal(int count, int elemSize);
-void *TW_ReallocateGlobal(void *ptr, int count, int elemSize);
-void TW_FreeGlobal(void *ptr);
+extern unsigned TW_EnableInterrupts(void);
+extern unsigned TW_DisableInterrupts(void);
+TwHeapAllocator *TW_GetGlobalAllocator(void);
 
 // structures.c
 // NOT thread-safe -- many of these functions should be locked on the outside in a concurrent context
@@ -62,6 +67,9 @@ int TW_GetSpaceUntilNextOccupiedHeapObject(TwHeapAllocator *alloc, void *ptr);
 void *TW_AllocateHeapObject(TwHeapAllocator *alloc, int count, int elemSize);
 void *TW_ReallocateHeapObject(TwHeapAllocator *alloc, void *ptr, int count, int elemSize);
 void TW_FreeHeapObject(TwHeapAllocator *alloc, void *ptr);
+
+void *TW_Allocate(TwHeapAllocator *alloc, void *ptr, int count, int elemSize);
+void TW_Free(TwHeapAllocator *alloc, void *ptr);
 
 TwFlexArray TW_MakeFlexArray(TwHeapAllocator *alloc, int initialCapacity);
 int TW_AppendFlexArray(TwFlexArray *array, char *data, int size);
@@ -78,3 +86,5 @@ int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...);
 // TODO: General concurrent objects
 // TODO: General thread pool
 int TW_MultiThreadingEnabled(void);
+void TW_LockMutex(void **mutex);
+void TW_UnlockMutex(void **mutex);
