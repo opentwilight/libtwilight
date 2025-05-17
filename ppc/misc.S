@@ -27,6 +27,7 @@ _tw_flush_memory_loop:
 	dcbst 0, 3
 	sync
 	icbi 0, 3
+	isync
 	addi 3, 3, 0x20
 	cmpw 0, 3, 5
 	bne+ _tw_flush_memory_loop
@@ -73,6 +74,8 @@ _tw_fill_words_sync_loop_post:
 
 .globl TW_CopyBytes
 TW_CopyBytes:
+	cmpwi 0, 5, 0
+	blelr
 	subf. 6, 3, 4
 	beqlr
 	blt _tw_copy_bytes_forward

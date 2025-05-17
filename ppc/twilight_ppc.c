@@ -18,7 +18,7 @@ static void init_twilight() {
 	_g_tw_heap.mutex = (void*)1; // use interrupt toggle as the lock, ie. global
 #if TW_WII
 	_g_tw_heap_ex = TW_MakeHeap((void*)TW_MEM2_START, (void*)TW_IOS_MEM_START);
-	_g_tw_heap.next = &_g_tw_heap_b;
+	_g_tw_heap.next = &_g_tw_heap_ex;
 #endif
 }
 

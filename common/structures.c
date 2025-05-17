@@ -80,18 +80,10 @@ static void _tw_free_heap_object(TwHeapAllocator *alloc, void *ptr) {
 }
 
 static void *_tw_reallocate_heap_object(TwHeapAllocator *alloc, void *ptr, int count, int elemSize) {
-	int cur_size = TW_RetrieveHeapObjectInnerSize(alloc, ptr);
+	int cur_size = TW_DetermineHeapObjectMaximumSize(alloc, ptr);
 	int new_size = TW_CalcHeapObjectInnerSize(count, elemSize);
-	if (new_size <= cur_size) {
-		TW_UpdateHeapObjectSize(alloc, ptr, new_size);
+	if (new_size <= cur_size)
 		return ptr;
-	}
-
-	int space_until_next = TW_GetSpaceUntilNextOccupiedHeapObject(alloc, ptr);
-	if (space_until_next < 0 || new_size < space_until_next) {
-		TW_UpdateHeapObjectSize(alloc, ptr, new_size);
-		return ptr;
-	}
 
 	void *new_ptr = _tw_allocate_heap_object(alloc, count, elemSize);
 	if (!new_ptr)
@@ -136,17 +128,25 @@ void TW_Free(TwHeapAllocator *alloc, void *ptr) {
 	TW_FreeHeapObject(alloc, ptr);
 }
 
-// TODO !!!
+int TW_DetermineHeapObjectMaximumSize(TwHeapAllocator *alloc, void *ptr) {
+	int total_inner = 0;
+	TwHeapBlockHeader *first_hdr = (TwHeapBlockHeader*)ptr - 1;
+	TwHeapBlockHeader *hdr = first_hdr;
 
-int TW_RetrieveHeapObjectInnerSize(TwHeapAllocator *alloc, void *ptr) {
-	return 0;
-}
+	while (1) {
+		if (hdr->next == (void*)0 || hdr == alloc->last)
+			return (unsigned)alloc->startAddr + alloc->capacity - (unsigned)ptr;
 
-void TW_UpdateHeapObjectSize(TwHeapAllocator *alloc, void *ptr, int newSize) {
+		if (((unsigned)hdr->next->prev & 1) == 0)
+			return (unsigned)hdr - (unsigned)ptr;
 
-}
+		TwHeapBlockHeader *next = hdr->next;
+		first_hdr->next = next->next;
+		next->prev = (void*)0;
+		next->next = (void*)0;
+		hdr = next;
+	}
 
-int TW_GetSpaceUntilNextOccupiedHeapObject(TwHeapAllocator *alloc, void *ptr) {
 	return 0;
 }
 

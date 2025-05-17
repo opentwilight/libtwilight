@@ -61,7 +61,7 @@ TwHeapAllocator *TW_GetGlobalAllocator(void);
 
 TwHeapAllocator TW_MakeHeap(void *startAddress, void *endAddress);
 int TW_CalcHeapObjectInnerSize(int count, int elemSize);
-int TW_RetrieveHeapObjectInnerSize(TwHeapAllocator *alloc, void *ptr);
+int TW_DetermineHeapObjectMaximumSize(TwHeapAllocator *alloc, void *ptr);
 void TW_UpdateHeapObjectSize(TwHeapAllocator *alloc, void *ptr, int newSize);
 int TW_GetSpaceUntilNextOccupiedHeapObject(TwHeapAllocator *alloc, void *ptr);
 void *TW_AllocateHeapObject(TwHeapAllocator *alloc, int count, int elemSize);
