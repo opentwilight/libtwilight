@@ -6,7 +6,7 @@ The goal of this library is to provide a suitable foundation for writing high-pe
 
 It is not trying to be a full-on POSIX-compatible kernel.
 
-Currently in early stages. Text output to XFB using a monospace bitmap font is working, and is successfully displayed to the screen.
+Currently in early stages. Gamecube controller input and text output to XFB using a monospace bitmap font is working, and is displayed to the screen.
 
 ## Setup
 
@@ -26,9 +26,9 @@ Call with `-DTW_WII` to compile for Wii instead
 - Optionally blend XFB text with background
 - Finish heap allocator
 	- List of disjoint pools, eg. one for MEM1 and MEM2
-- Serial (for Gamecube input)
 - Friendly DSI and ISI exception crash handler (segfault)
 	- With future plans to implement lazy loading within these handlers
+- Basic maths functions (similar to list in C standard math.h)
 
 ## Secondary TODO
 
@@ -38,8 +38,11 @@ Call with `-DTW_WII` to compile for Wii instead
 - Custom threading implementation
 	- Use decrement register for scheduling software interrupts
 	- Synchronisation primitives (atomics, semaphores, etc)
-- Optional serial interrupts, for input events (ie. notfiy instead of just poll)
-- Maths
+- Serial Interface
+	- Buffer transfers
+	- Different kinds of controllers
+	- Interrupts, for input events (ie. notfiy instead of just poll)
+- Matrix Maths
 - GC hardware
 	- EXI
 	- DVD
@@ -48,10 +51,8 @@ Call with `-DTW_WII` to compile for Wii instead
 		- Custom microcode
 		- Manage ARAM
 	- GPU
-		- GX
 - Wii hardware
-	- IOS
-	- STM (system control over IOS)
+	- IOS in general
 	- Bluetooth
 		- Wiimote
 		- Nunchuk
@@ -77,6 +78,14 @@ Call with `-DTW_WII` to compile for Wii instead
 	- POSIX file wrapper
 		- open, read, write, flush, close, etc.
 		- file table
+
+Still deciding whether to implement the interface for every IOS module on PPC (eg. ES, STM, etc)...
+
+Or if this project can make it easy for people to deploy their own Starlet code,
+maybe a lot of IOS concepts are no longer relevant.
+
+So perhaps it would make more sense for people to just issue raw IOS calls themselves,
+allowing them to take advantage of a potentially different Starlet firmware.
 
 ## Might implement later
 
