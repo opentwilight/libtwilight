@@ -3,7 +3,7 @@
 import sys
 import subprocess
 
-# clang -target powerpc-eabi -m32 -nostdlib -Ippc -DTW_WII=1 -Wl,-Tppc/sections.ld ppc/*.S ppc/*.c examples/hello_world.c -o examples/hello_world.elf
+# clang -target powerpc-eabi -m32 -nostdlib -Ippc -DTW_WII -Wl,-Tppc/sections.ld ppc/*.S ppc/*.c examples/hello_world.c -o examples/hello_world.elf
 
 def main(args):
 	subprocess.run([
@@ -12,7 +12,7 @@ def main(args):
 		"powerpc-eabi",
 		"-m32",
 		"-nostdlib",
-		"-DTW_WII=1",
+		"-DTW_WII",
 		"examples/poke_test.c",
 		"-o",
 		"examples/poke_test.elf"

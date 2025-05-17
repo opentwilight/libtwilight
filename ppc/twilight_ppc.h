@@ -4,7 +4,7 @@
 
 #define POKE_SPR(nStr, valueVar) __asm("mtspr " nStr ", %0" : : "b"(valueVar))
 
-#if TW_WII
+#ifdef TW_WII
 #define TW_INTERRUPT_BIT_STARLET_TIMER (16 + 0)
 #define TW_INTERRUPT_BIT_NAND          (16 + 1)
 #define TW_INTERRUPT_BIT_AES           (16 + 2)
@@ -50,7 +50,7 @@
 #define TW_VIDEO_REG_BASE      0xCC002000
 #define TW_INTERRUPT_REG_BASE  0xCC003000
 
-#if TW_WII
+#ifdef TW_WII
 #define TW_SERIAL_REG_BASE  0xCD006400
 #define TW_IRQ_WII_REG_BASE 0xD0000030
 #else
@@ -62,6 +62,25 @@
 #define TW_VIDEO_MPAL  2
 
 #define TW_PPC_COUNT_LEADING_ZEROS(output, input) __asm("cntlzd %0,%1" : "w"(output) : "r"(input))
+
+typedef union {
+	unsigned words[2];
+	struct {
+		// e = error, s = Start, y = Y Button, x = X Button, b = B Button, a = A Button
+		// L = Left Trigger, R = Right Trigger, z = Z Button, udrl = D-Pad directions
+		// -------------------
+		// ee_s yxba _LRz udrl
+		// 0123 4567 89ab cdef
+		// -------------------
+		unsigned short buttons; // see above
+		unsigned char analogX; // 32 = max left, 128 = neutral, 224 = max right
+		unsigned char analogY; // 32 = max up, 128 = neutral, 224 max down
+		unsigned char cStickX; // 32 = max left, 128 = neutral, 224 = max right
+		unsigned char cStickY; // 32 = max up, 128 = neutral, 224 max down
+		unsigned char triggerL; // 32 = minimum, 224 maximum
+		unsigned char triggerR; // 32 = minimum, 224 maximum
+	} gamecube;
+} TwSerialInput;
 
 typedef struct {
 	unsigned *xfb;
@@ -96,11 +115,13 @@ unsigned TW_GetFramebufferAddress(int *outSize);
 void TW_InitVideo(TwVideo *params);
 void TW_AwaitVideoVBlank(TwVideo *params);
 void TW_ClearVideoScreen(TwVideo *params, unsigned color);
-void TW_DrawAsciiSpan(TwVideo *video, TwTermFont *font, unsigned back, unsigned fore, int x, int y, const char *str, int count);
+void TW_DrawAsciiSpan(TwVideo *video, TwTermFont *font, unsigned back, unsigned fore, float x, float y, const char *str, int count);
 void TW_WriteTerminalAscii(TwTerminal *params, TwVideo *video, const char *chars, int len);
 
 // serial.c
 void TW_SetSerialPollInterval(unsigned line, unsigned count);
+void TW_SetupSerialDevices(unsigned portMask);
+TwSerialInput TW_GetSerialInputs(int port);
 
 // interrupts.c
 void TW_SetTimerInterrupt(void (*handler)(), unsigned quadCycles);

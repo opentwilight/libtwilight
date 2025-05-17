@@ -47,7 +47,7 @@ _init_bats:
 	mtspr 542, 4
 	mtspr 543, 4
 
-#if TW_WII
+#ifdef TW_WII
 	isync
 	lis 3, 0x8200
 	mtspr 1011, 3 // set HID4 (is it SPR 1011?) to 0x82 << 24 to enable HID4 access and BATs 5-8

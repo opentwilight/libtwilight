@@ -34,7 +34,7 @@ static void _tw_dispatch_external_interrupt() {
 	MAYBE_INVOKE_THEN_RETURN(active, 0, TW_INTERRUPT_BIT_SERIAL)
 	MAYBE_INVOKE_THEN_RETURN(active, 0, TW_INTERRUPT_BIT_DVD)
 	MAYBE_INVOKE_THEN_RETURN(active, 0, TW_INTERRUPT_BIT_FIFO)
-#if TW_WII
+#ifdef TW_WII
 	if ((active & (1 << TW_INTERRUPT_BIT_ACR)) != 0) {
 		cause = PEEK_U32(TW_IRQ_WII_REG_BASE + 0x30);
 		mask  = PEEK_U32(TW_IRQ_WII_REG_BASE + 0x34);
@@ -117,7 +117,7 @@ void TW_SetExternalInterruptHandler(int interruptType, void (*handler)()) {
 			__tw_external_interrupt_handler_table[interruptType] = handler;
 			POKE_U32(TW_INTERRUPT_REG_BASE + 4, (1 << interruptType) | PEEK_U32(TW_INTERRUPT_REG_BASE + 4));
 			break;
-#if TW_WII
+#ifdef TW_WII
 		case TW_INTERRUPT_BIT_STARLET_TIMER:
 		case TW_INTERRUPT_BIT_NAND:
 		case TW_INTERRUPT_BIT_AES:

@@ -152,15 +152,15 @@ void TW_ClearVideoScreen(TwVideo *params, unsigned color) {
 	TW_FillWordsAndFlush((unsigned*)params->xfb, color, 320 * 480);
 }
 
-void TW_DrawAsciiSpan(TwVideo *video, TwTermFont *font, unsigned back, unsigned fore, int x, int y, const char *str, int count) {
+void TW_DrawAsciiSpan(TwVideo *video, TwTermFont *font, unsigned back, unsigned fore, float x, float y, const char *str, int count) {
 	if (!font)
 		font = &_default_font;
 
-	int halfw = (font->width / 2);
-	int w = count * halfw;
-	int h = font->height;
-	int x_off = 0;
-	int y_off = 0;
+	int halfw = font->width / 2;
+	float w = count * halfw;
+	float h = (float)font->height;
+	float x_off = 0;
+	float y_off = 0;
 	if (x < 0) {
 		x_off = -x;
 		x = 0;
@@ -171,11 +171,11 @@ void TW_DrawAsciiSpan(TwVideo *video, TwTermFont *font, unsigned back, unsigned 
 		y = 0;
 		h -= y_off;
 	}
-	if (x + w > 320) {
-		w = 320 - x;
+	if (x + w > 320.f) {
+		w = 320.f - x;
 	}
-	if (y + h > 480) {
-		h = 480 - y;
+	if (y + h > 480.f) {
+		h = 480.f - y;
 	}
 
 	if (w <= 0 || h <= 0) {
@@ -192,14 +192,14 @@ void TW_DrawAsciiSpan(TwVideo *video, TwTermFont *font, unsigned back, unsigned 
 	for (int i = 0; i < h; i++) {
 		// FIXME: this won't work for glyphs of an odd width
 		for (int j = 0; j < w; j++) {
-			char ch = str[(j + x_off) / halfw];
+			char ch = str[(j + (int)x_off) / halfw];
 			int idx = ch < 0x20 || ch > 0x7e ? 0 : ((int)ch - 0x20);
-			int bit_pos = idx * font->bytes_per_glyph * 8 + ((i + y_off) * halfw + ((j + x_off) % halfw)) * 2;
+			int bit_pos = idx * font->bytes_per_glyph * 8 + ((i + (int)y_off) * halfw + ((j + (int)x_off) % halfw)) * 2;
 			int c = (font->data[bit_pos >> 3] >> (6 - (bit_pos & 7))) & 3;
 			int offset = (i + y) * 320 + j + x;
 			video->xfb[offset] = colors[c];
 		}
-		TW_FlushMemory(&video->xfb[(i + y) * 320 + x], w * 4);
+		TW_FlushMemory(&video->xfb[(i + (int)y) * 320 + (int)x], w * 4);
 	}
 }
 

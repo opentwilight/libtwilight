@@ -7,7 +7,7 @@ extern unsigned __stack_size;
 static int _initialized = 0;
 
 static TwHeapAllocator _g_tw_heap;
-#if TW_WII
+#ifdef TW_WII
 static TwHeapAllocator _g_tw_heap_ex;
 #endif
 
@@ -16,7 +16,7 @@ static void init_twilight() {
 	unsigned framebuffer = TW_GetFramebufferAddress(&fb_size);
 	_g_tw_heap = TW_MakeHeap((void*)(framebuffer + fb_size), (void*)TW_MEM1_END);
 	_g_tw_heap.mutex = (void*)1; // use interrupt toggle as the lock, ie. global
-#if TW_WII
+#ifdef TW_WII
 	_g_tw_heap_ex = TW_MakeHeap((void*)TW_MEM2_START, (void*)TW_IOS_MEM_START);
 	_g_tw_heap.next = &_g_tw_heap_ex;
 #endif
