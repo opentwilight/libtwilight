@@ -6,10 +6,7 @@ int TW_MultiThreadingEnabled(void) {
 
 void TW_LockMutex(void **mutex) {
 	unsigned value = (unsigned)*mutex;
-	if (!value)
-		return;
-
-	if (value < 0x10000) {
+	if (value >= 1 && value < 0x10000) {
 		if (value == 1)
 			TW_DisableInterrupts();
 		*mutex = (void*)(value + 1);
@@ -21,10 +18,7 @@ void TW_LockMutex(void **mutex) {
 
 void TW_UnlockMutex(void **mutex) {
 	unsigned value = (unsigned)*mutex;
-	if (!value)
-		return;
-
-	if (value < 0x10000) {
+	if (value >= 2 && value <= 0x10000) {
 		if (value == 2)
 			TW_EnableInterrupts();
 		*mutex = (void*)(value - 1);

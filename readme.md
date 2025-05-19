@@ -28,13 +28,15 @@ Call with `-DTW_WII` to compile for Wii instead
 	- List of disjoint pools, eg. one for MEM1 and MEM2
 - Friendly DSI and ISI exception crash handler (segfault)
 	- With future plans to implement lazy loading within these handlers
+- Return to loader on return from main()
 - Basic maths functions (similar to list in C standard math.h)
+- Start work on custom libc implementation that wraps libtwilight
+	- libtwilight **must not** depend on libc, libc must depend on libtwilight
+	- limited POSIX
 
 ## Secondary TODO
 
-- Custom libc implementation that wraps libtwilight
-	- libtwilight **must not** depend on libc, libc must depend on libtwilight
-	- limited POSIX
+- Finish libc
 - Custom threading implementation
 	- Use decrement register for scheduling software interrupts
 	- Synchronisation primitives (atomics, semaphores, etc)
@@ -42,7 +44,14 @@ Call with `-DTW_WII` to compile for Wii instead
 	- Buffer transfers
 	- Different kinds of controllers
 	- Interrupts, for input events (ie. notfiy instead of just poll)
-- Matrix Maths
+- GX
+	- More maths
+		- Matrices
+		- Quaternions
+		- Fast trig
+	- Display lists
+	- Textures
+	- Pipelines
 - GC hardware
 	- EXI
 	- DVD
@@ -50,7 +59,6 @@ Call with `-DTW_WII` to compile for Wii instead
 	- DSP
 		- Custom microcode
 		- Manage ARAM
-	- GPU
 - Wii hardware
 	- IOS in general
 	- Bluetooth

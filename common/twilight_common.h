@@ -37,6 +37,13 @@ typedef struct tw_stream TwStream;
 
 typedef struct {
 	TwStream stream;
+	char *buffer;
+	int offset;
+	int capacity;
+} TwBufferStream;
+
+typedef struct {
+	TwStream stream;
 	TwHeapAllocator *alloc;
 	int capacity;
 	int size;
@@ -59,7 +66,7 @@ TwHeapAllocator *TW_GetGlobalAllocator(void);
 // structures.c
 // NOT thread-safe -- many of these functions should be locked on the outside in a concurrent context
 
-TwHeapAllocator TW_MakeHeap(void *startAddress, void *endAddress);
+TwHeapAllocator TW_MakeHeapAllocator(void *startAddress, void *endAddress);
 int TW_CalcHeapObjectInnerSize(int count, int elemSize);
 int TW_DetermineHeapObjectMaximumSize(TwHeapAllocator *alloc, void *ptr);
 void TW_UpdateHeapObjectSize(TwHeapAllocator *alloc, void *ptr, int newSize);
@@ -70,6 +77,8 @@ void TW_FreeHeapObject(TwHeapAllocator *alloc, void *ptr);
 
 void *TW_Allocate(TwHeapAllocator *alloc, void *ptr, int count, int elemSize);
 void TW_Free(TwHeapAllocator *alloc, void *ptr);
+
+TwBufferStream TW_MakeBufferStream(char *data, int size);
 
 TwFlexArray TW_MakeFlexArray(TwHeapAllocator *alloc, int initialCapacity);
 int TW_AppendFlexArray(TwFlexArray *array, char *data, int size);

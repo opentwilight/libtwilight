@@ -4,11 +4,16 @@
 	if (!alloc) { \
 		alloc = TW_GetGlobalAllocator(); \
 	} \
-	TW_LockMutex(&alloc->mutex)
+	if (alloc->mutex) { \
+		TW_LockMutex(&alloc->mutex); \
+	}
 
-#define END_ALLOCATOR_METHOD() TW_UnlockMutex(&alloc->mutex)
+#define END_ALLOCATOR_METHOD() \
+	if (alloc->mutex) { \
+		TW_UnlockMutex(&alloc->mutex); \
+	}
 
-TwHeapAllocator TW_MakeHeap(void *startAddress, void *endAddress) {
+TwHeapAllocator TW_MakeHeapAllocator(void *startAddress, void *endAddress) {
 	int capacity = endAddress - startAddress;
 	if (capacity < 0) {
 		void *temp = startAddress;
@@ -35,34 +40,43 @@ int TW_CalcHeapObjectInnerSize(int count, int elemSize) {
 	return count * elemSize;
 }
 
-// TODO: Look at previous heap entries for until there's enough space for the new entry,
-//        but look past the first free entry in case there's contiguous free blocks that take up enough space together
+static void *_tw_search_for_suitable_block(TwHeapAllocator *alloc, int allocSize) {
+	TwHeapBlockHeader *hdr = alloc->first;
+	while (hdr) {
+		if (((unsigned)hdr->prev & 1) != 0) {
+			int blockSize = TW_DetermineHeapObjectMaximumSize(alloc, &hdr[1]);
+			if (blockSize >= allocSize)
+				return &hdr[1];
+		}
+		hdr = hdr->next;
+	}
+	return (void*)0;
+}
 
-static void *_tw_allocate_heap_object_inner(TwHeapAllocator *alloc, int count, int elemSize) {
+static void *_tw_allocate_heap_object(TwHeapAllocator *alloc, int count, int elemSize) {
 	int size = TW_CalcHeapObjectInnerSize(count, elemSize);
 	if (size <= 0)
 		return (void*)0;
 
-	TwHeapBlockHeader *hdr = alloc->last ? alloc->last->next : alloc->first;
-	unsigned start = (unsigned)&hdr[1];
-
-	int alloc_size = (size + 3) & ~3;
-	unsigned next = start + alloc_size;
-	if (next + sizeof(TwHeapBlockHeader) > (unsigned)alloc->startAddr + alloc->capacity)
-		return (void*)0;
-
-	hdr->next = (TwHeapBlockHeader*)next;
-	hdr->prev = alloc->last;
-	alloc->last = hdr;
-
-	return (void*)start;
-}
-
-static void *_tw_allocate_heap_object(TwHeapAllocator *alloc, int count, int elemSize) {
 	while (alloc) {
-		void *ptr = _tw_allocate_heap_object_inner(alloc, count, elemSize);
-		if (ptr)
-			return ptr;
+		TwHeapBlockHeader *hdr = alloc->last ? alloc->last->next : alloc->first;
+		unsigned start = (unsigned)&hdr[1];
+
+		int alloc_size = (size + 3) & ~3;
+		unsigned next = start + alloc_size;
+
+		if (next + sizeof(TwHeapBlockHeader) > (unsigned)alloc->startAddr + alloc->capacity) {
+			void *ptr = _tw_search_for_suitable_block(alloc, alloc_size);
+			start = (unsigned)ptr;
+		}
+
+		if (start) {
+			hdr->next = (TwHeapBlockHeader*)next;
+			hdr->prev = alloc->last;
+			alloc->last = hdr;
+			return (void*)start;
+		}
+
 		alloc = alloc->next;
 	}
 	return (void*)0;
@@ -135,7 +149,7 @@ int TW_DetermineHeapObjectMaximumSize(TwHeapAllocator *alloc, void *ptr) {
 
 	while (1) {
 		if (hdr->next == (void*)0 || hdr == alloc->last)
-			return (unsigned)alloc->startAddr + alloc->capacity - (unsigned)ptr;
+			return (unsigned)alloc->startAddr + alloc->capacity - (unsigned)ptr - sizeof(TwHeapBlockHeader);
 
 		if (((unsigned)hdr->next->prev & 1) == 0)
 			return (unsigned)hdr - (unsigned)ptr;
@@ -148,6 +162,29 @@ int TW_DetermineHeapObjectMaximumSize(TwHeapAllocator *alloc, void *ptr) {
 	}
 
 	return 0;
+}
+
+static int _tw_write_buffer_stream(TwStream *stream, char *data, int size) {
+	TwBufferStream *bs = (TwBufferStream*)stream->parent;
+	if (bs->offset + size > bs->capacity)
+		return -1;
+
+	TW_CopyBytes(&bs->buffer[bs->offset], data, size);
+	bs->offset += size;
+	return size;
+}
+
+TwBufferStream TW_MakeBufferStream(char *data, int size) {
+	TwBufferStream bs = (TwBufferStream) {
+		.buffer = data,
+		.offset = 0,
+		.capacity = size
+	};
+	bs.stream = (TwStream) {
+		.parent = &bs,
+		.transfer = _tw_write_buffer_stream
+	};
+	return bs;
 }
 
 static int _tw_write_flex_array(TwStream *stream, char *data, int size) {

@@ -344,9 +344,15 @@ int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...) {
 		prev = c;
 	}
 
-	int bytesWritten = flushes * FMT_BUFFER + pos;
-	if (pos > 0)
+	if (pos + 1 > FMT_BUFFER) {
 		sink->transfer(sink, buf, pos);
+		flushes++;
+		pos = 0;
+	}
+	buf[pos++] = 0;
+
+	int bytesWritten = flushes * FMT_BUFFER + pos;
+	sink->transfer(sink, buf, pos);
 
 	va_end(args);
 	return bytesWritten;

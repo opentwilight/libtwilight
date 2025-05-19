@@ -14,10 +14,10 @@ static TwHeapAllocator _g_tw_heap_ex;
 static void init_twilight() {
 	int fb_size;
 	unsigned framebuffer = TW_GetFramebufferAddress(&fb_size);
-	_g_tw_heap = TW_MakeHeap((void*)(framebuffer + fb_size), (void*)TW_MEM1_END);
+	_g_tw_heap = TW_MakeHeapAllocator((void*)(framebuffer + fb_size), (void*)TW_MEM1_END);
 	_g_tw_heap.mutex = (void*)1; // use interrupt toggle as the lock, ie. global
 #ifdef TW_WII
-	_g_tw_heap_ex = TW_MakeHeap((void*)TW_MEM2_START, (void*)TW_IOS_MEM_START);
+	_g_tw_heap_ex = TW_MakeHeapAllocator((void*)TW_MEM2_START, (void*)TW_IOS_MEM_START);
 	_g_tw_heap.next = &_g_tw_heap_ex;
 #endif
 }
