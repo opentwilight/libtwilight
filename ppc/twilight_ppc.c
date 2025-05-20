@@ -1,4 +1,4 @@
-#include "twilight_ppc.h"
+#include <twilight_ppc.h>
 
 extern unsigned __toc_region;
 extern unsigned __toc_size;

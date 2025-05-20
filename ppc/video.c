@@ -1,5 +1,5 @@
-#include "twilight_ppc.h"
-#include "font.h"
+#include <twilight_ppc.h>
+#include <font.h>
 
 #define TERMINAL_COLS 80
 #define TERMINAL_ROWS 30

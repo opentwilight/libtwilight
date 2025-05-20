@@ -59,6 +59,7 @@ typedef struct {
 
 // These must be defined in the architecture implementation, ie. ppc or arm
 extern void *TW_CopyBytes(void *dst, const void *src, int len);
+unsigned TW_DivideU64(unsigned long long *value, unsigned base);
 extern unsigned TW_EnableInterrupts(void);
 extern unsigned TW_DisableInterrupts(void);
 TwHeapAllocator *TW_GetGlobalAllocator(void);

@@ -14,9 +14,9 @@ Install LLVM and Clang.
 
 ## Compile
 
-`clang -target powerpc-eabi -m32 -nostdlib -Ippc -Wl,-Tppc/sections.ld ppc/*.S ppc/*.c common/*.c examples/hello_world.c -o examples/hello_world.elf`
+`clang -g -target powerpc-eabi -m32 -nostdlib -Iinclude -Wl,-Tppc/sections.ld ppc/*.S ppc/*.c common/*.c examples/hello_world.c -o examples/hello_world.elf`
 
-Call with `-DTW_WII` to compile for Wii instead
+Call with `-DTW_WII` to compile for Wii instead.
 
 ## Immediate TODO
 

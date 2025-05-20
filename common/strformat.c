@@ -1,4 +1,4 @@
-#include "twilight_common.h"
+#include <twilight_common.h>
 
 #define FMT_BUFFER 512
 #define NUMERIC_BUFFER 64
@@ -42,8 +42,7 @@ int TW_WriteInteger(char *outBuf, int maxSize, int minWidth, unsigned bits, unsi
 
 	int pos = 0;
 	while (value && pos < 64) {
-		unsigned rem = value % (unsigned long long)base;
-		value /= (unsigned long long)base;
+		unsigned rem = TW_DivideU64(&value, base);
 		buf[pos++] = inc[rem >= 10] + (char)rem;
 	}
 

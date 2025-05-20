@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../common/twilight_common.h"
+#include "../include/twilight_common.h"
 
 extern void initTestingGlobalAllocator();
 
@@ -63,6 +63,7 @@ int main() {
 	TEST(__LINE__, "%#04X", -149)
 	TEST(__LINE__, "a%dc", -26)
 	TEST(__LINE__, "%*d", 5, 67);
+	TEST(__LINE__, "Hello %s! Nice to meet you.", "there");
 
 	return 0;
 }

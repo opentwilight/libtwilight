@@ -1,4 +1,4 @@
-#include "twilight_ppc.h"
+#include <twilight_ppc.h>
 
 void TW_SetSerialPollInterval(unsigned line, unsigned count) {
 	// kind of a race with TW_SetSerialControllerCount with this register

@@ -69,4 +69,4 @@ def main(args):
 if len(sys.argv) > 1:
 	main(sys.argv[1:])
 else:
-	main(["tw-ascii.png", "ppc/font.h", "16", "6", "8", "10"])
+	main(["tw-ascii.png", "include/font.h", "16", "6", "8", "10"])

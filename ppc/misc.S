@@ -128,6 +128,72 @@ TW_HasOneBitSet:
 	rlwinm 3, 4, 28, 0, 31
 	blr
 
+.globl TW_U32ToDouble
+TW_U32ToDouble:
+	stwu 1, -16(1)
+	stw 3, 8(1)
+	lis 4, 0x4330
+	stw 4, 4(1)
+	lfd 0, 4(1)
+	lis 4, 0x5980
+	stw 4, 12(1)
+	lfs 1, 12(1)
+	fsub 1, 0, 1
+	addi 1, 1, 16
+	blr
+
+.globl TW_ModuloDouble // returns the integer division result in r3, and the normalized modulo in f1
+TW_ModuloDouble:
+	stwu 1, -16(1)
+	mr 5, 3
+	fdiv 3, 1, 2
+	fctiwz 4, 3
+	stfs 4, 8(1)
+	lwz 3, 8(1)
+	bl TW_U32ToDouble
+	fsub 1, 3, 1 // normalized modulo (0.0-1.0)
+	addi 1, 1, 16
+	blr
+
+.globl TW_DivideU64 // unsigned TW_DivideU64(unsigned long long *value, unsigned div)
+TW_DivideU64:
+	stwu 1, -16(1)
+	mr 6, 3
+	mr 5, 4
+	lwz 3, 0(6)
+	lwz 4, 4(6)
+	divwu 7, 3, 5
+	mullw 8, 7, 5
+	subf 8, 3, 8
+	divwu 9, 4, 5
+	mullw 10, 9, 5
+	subf 10, 4, 10
+	cmpwi 0, 8, 0
+	beq _tw_divu64_after_upper_rem // if there's no remainder in the upper 32 bit division, then skip
+	mr 3, 5
+	bl TW_U32ToDouble // convert the divisor to a double
+	fmr 2, 1
+	mr 3, 8
+	bl TW_U32ToDouble // convert the upper 32-bit remainder to a double
+	fmr 3, 1
+	lis 3, 0x4f80
+	stw 3, 8(1)
+	lfs 1, 8(1)
+	fmul 1, 1, 3
+	bl TW_ModuloDouble // divide f1 by f2, with the division result going to r3 and the normalized modulo going to f1
+	add 9, 9, 3 // add the division result as an integer to the lower 32-bit divsion result
+	fmul 1, 1, 2 // un-normalize our modulo
+	fctiwz 3, 1
+	stfs 3, 12(1)
+	lwz 4, 12(1) // get it in r4 as an integer
+	add 10, 10, 4 // add to our overall remainder
+_tw_divu64_after_upper_rem:
+	stw 7, 0(6)
+	stw 9, 4(6)
+	mr 3, 10
+	addi 1, 1, 16
+	blr
+
 .globl __tw_external_interrupt_handler_table
 __tw_external_interrupt_handler_table:
 	.fill 48, 4, 0
