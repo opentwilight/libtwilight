@@ -1,2 +1,3 @@
 ppc/font.h
 examples/hello_world.elf
+tests/format_test
