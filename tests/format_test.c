@@ -9,11 +9,10 @@ extern void initTestingGlobalAllocator();
 
 #define TEST(lineno, fmt, ...) \
 	bs.offset = 0; \
-	TW_FormatString(&bs.stream, BUFFER_SIZE, fmt, __VA_ARGS__); \
-	snprintf(bufstd, BUFFER_SIZE, fmt, __VA_ARGS__); \
-	if (strcmp(buftw, bufstd)) { \
-		printf("Format test on line %d failed!\nTW_FormatString: %s\nsnprintf: %s\n", lineno, buftw, bufstd); \
-		return 1; \
+	lenA = TW_FormatString(&bs.stream, BUFFER_SIZE, fmt, __VA_ARGS__); \
+	lenB = snprintf(bufstd, BUFFER_SIZE, fmt, __VA_ARGS__); \
+	if (lenA != lenB || strcmp(buftw, bufstd)) { \
+		printf("Format test on line %d failed!\nTW_FormatString:  \"%s\"\nsnprintf:         \"%s\"\n", lineno, buftw, bufstd); \
 	}
 
 int main() {
@@ -23,8 +22,47 @@ int main() {
 	char bufstd[BUFFER_SIZE];
 
 	TwBufferStream bs = TW_MakeBufferStream(buftw, BUFFER_SIZE);
+	int lenA = 0;
+	int lenB = 0;
 
 	TEST(__LINE__, "%d", 5)
+	TEST(__LINE__, "%d", 26)
+	TEST(__LINE__, "%03d", 26)
+	TEST(__LINE__, "%d", -26)
+	TEST(__LINE__, "%+d", 26)
+	TEST(__LINE__, "%+d", -26)
+	TEST(__LINE__, "%+04d", 26)
+	TEST(__LINE__, "%+04d", -26)
+	TEST(__LINE__, "%+-4d", 26)
+	TEST(__LINE__, "%+-4d", -26)
+	TEST(__LINE__, "%-8d", 26)
+	TEST(__LINE__, "%-8d", -26)
+	TEST(__LINE__, "%o", 29)
+	TEST(__LINE__, "%o", -29)
+	TEST(__LINE__, "%#o", 29)
+	TEST(__LINE__, "%#o", -29)
+	TEST(__LINE__, "%6o", 29)
+	TEST(__LINE__, "%6o", -29)
+	TEST(__LINE__, "%#6o", 29)
+	TEST(__LINE__, "%#6o", -29)
+	TEST(__LINE__, "%x", 149)
+	TEST(__LINE__, "%x", -149)
+	TEST(__LINE__, "%#x", 149)
+	TEST(__LINE__, "%#x", -149)
+	TEST(__LINE__, "%X", 149)
+	TEST(__LINE__, "%X", -149)
+	TEST(__LINE__, "%#X", 149)
+	TEST(__LINE__, "%#X", -149)
+	TEST(__LINE__, "%04x", 149)
+	TEST(__LINE__, "%04x", -149)
+	TEST(__LINE__, "%#04x", 149)
+	TEST(__LINE__, "%#04x", -149)
+	TEST(__LINE__, "%04X", 149)
+	TEST(__LINE__, "%04X", -149)
+	TEST(__LINE__, "%#04X", 149)
+	TEST(__LINE__, "%#04X", -149)
+	TEST(__LINE__, "a%dc", -26)
+	TEST(__LINE__, "%*d", 5, 67);
 
 	return 0;
 }

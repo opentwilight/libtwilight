@@ -3,24 +3,83 @@
 #define FMT_BUFFER 512
 #define NUMERIC_BUFFER 64
 
-int TW_WriteHexDouble(char *buf, int maxSize, double value) {
+#define DOUBLE_AUTO       0
+#define DOUBLE_SCIENTIFIC 1
+#define DOUBLE_DECIMAL    2
+#define DOUBLE_HEX        3
+
+int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int mode, double value) {
 	return 0;
 }
 
-int TW_WriteDecimalDouble(char *buf, int maxSize, double value) {
-	return 0;
-}
+int TW_WriteInteger(char *outBuf, int maxSize, int minWidth, unsigned bits, unsigned base, unsigned flags, unsigned long long value) {
+	if (value == 0 || base <= 1) {
+		outBuf[0] = '0';
+		return 1;
+	}
 
-int TW_WriteAutoDouble(char *buf, int maxSize, double value) {
-	return 0;
-}
+	char buf[64];
+	int isNeg = 0;
+	if (bits % 2 == 1) {
+		if (value >> bits) {
+			value = ~value + 1;
+			isNeg = 1;
+		}
+		bits++;
+	}
 
-int TW_WriteDouble(char *buf, int maxSize, double value) {
-	return 0;
-}
+	value &= ((1ull << bits) - 1ull);
 
-int TW_WriteInteger(char *buf, int maxSize, int bits, int base, int isUpper, int value) {
-	return 0;
+	char isUpper = (flags & 1) != 0;
+	char padCh = (flags & 2) ? '0' : ' ';
+	char sign = (flags & 4) != 0;
+	char isLeft = (flags & 8) != 0;
+	char isAlt = (flags & 16) != 0;
+
+	char inc[2];
+	inc[0] = '0';
+	inc[1] = (char)(0x57 - (isUpper << 5));
+
+	int pos = 0;
+	while (value && pos < 64) {
+		unsigned rem = value % (unsigned long long)base;
+		value /= (unsigned long long)base;
+		buf[pos++] = inc[rem >= 10] + (char)rem;
+	}
+
+	int space = pos + (isNeg || sign) + (isAlt && (base == 16 || base == 8)) + (isAlt && base == 16);
+	int outPos = 0;
+
+	if (space < minWidth && padCh == ' ' && !isLeft) {
+		for (int i = 0; i < minWidth - space && outPos < maxSize; i++)
+			outBuf[outPos++] = padCh;
+	}
+
+	if ((isNeg || sign) && outPos < maxSize)
+		outBuf[outPos++] = isNeg ? '-' : '+';
+
+	if (isAlt) {
+		if ((base == 16 || base == 8) && outPos < maxSize)
+			outBuf[outPos++] = '0';
+		if (base == 16 && outPos < maxSize)
+			outBuf[outPos++] = isUpper ? 'X' : 'x';
+	}
+
+	if (padCh == '0' && !isLeft) {
+		for (int i = 0; i < minWidth - space && outPos < maxSize; i++)
+			outBuf[outPos++] = padCh;
+	}
+
+	for (int i = 0; i < pos && outPos < maxSize; i++) {
+		outBuf[outPos++] = buf[pos-i-1];
+	}
+
+	if (space < minWidth && isLeft) {
+		for (int i = 0; i < minWidth - space && outPos < maxSize; i++)
+			outBuf[outPos++] = ' ';
+	}
+
+	return outPos;
 }
 
 int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...) {
@@ -167,6 +226,13 @@ int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...) {
 					continue;
 			}
 			if (format_mode == 6) {
+				if (fmt_min_width == -1) {
+					fmt_min_width = va_arg(args, int);
+				}
+				if (fmt_precision == -1) {
+					fmt_precision = va_arg(args, int);
+				}
+
 				int numericBytesWritten = 0;
 				switch (c) {
 					case 'a':
@@ -174,7 +240,7 @@ int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...) {
 					{
 						// hex float
 						double value = va_arg(args, double);
-						numericBytesWritten = TW_WriteHexDouble(numeric_buf, NUMERIC_BUFFER, value);
+						numericBytesWritten = TW_WriteDouble(numeric_buf, NUMERIC_BUFFER, fmt_min_width, fmt_precision, DOUBLE_HEX, value);
 						break;
 					}
 					case 'c':
@@ -206,7 +272,10 @@ int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...) {
 							long long v = va_arg(args, long long);
 							value = (unsigned long long)v;
 						}
-						numericBytesWritten = TW_WriteInteger(numeric_buf, NUMERIC_BUFFER, format_bits - 1, 10, 0, value);
+
+						// isLeft, sign, isZeroPad, isUpper (always false)
+						unsigned flags = ((format_flags & 1) << 3) | ((format_flags & 2) << 1) | ((format_flags & 16) >> 3);
+						numericBytesWritten = TW_WriteInteger(numeric_buf, NUMERIC_BUFFER, fmt_min_width, format_bits - 1, 10, flags, value);
 						break;
 					}
 					case 'e':
@@ -214,7 +283,7 @@ int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...) {
 					{
 						// decimal float
 						double value = va_arg(args, double);
-						numericBytesWritten = TW_WriteDecimalDouble(numeric_buf, NUMERIC_BUFFER, value);
+						numericBytesWritten = TW_WriteDouble(numeric_buf, NUMERIC_BUFFER, fmt_min_width, fmt_precision, DOUBLE_DECIMAL, value);
 						break;
 					}
 					case 'f':
@@ -222,7 +291,7 @@ int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...) {
 					{
 						// float
 						double value = va_arg(args, double);
-						numericBytesWritten = TW_WriteDouble(numeric_buf, NUMERIC_BUFFER, value);
+						numericBytesWritten = TW_WriteDouble(numeric_buf, NUMERIC_BUFFER, fmt_min_width, fmt_precision, DOUBLE_SCIENTIFIC, value);
 						break;
 					}
 					case 'g':
@@ -230,7 +299,7 @@ int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...) {
 					{
 						// automatic float
 						double value = va_arg(args, double);
-						numericBytesWritten = TW_WriteAutoDouble(numeric_buf, NUMERIC_BUFFER, value);
+						numericBytesWritten = TW_WriteDouble(numeric_buf, NUMERIC_BUFFER, fmt_min_width, fmt_precision, DOUBLE_AUTO, value);
 						break;
 					}
 					case 'n':
@@ -265,7 +334,10 @@ int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...) {
 						int base = 16;
 						if (c == 'o') base = 8;
 						if (c == 'u') base = 10;
-						numericBytesWritten = TW_WriteInteger(numeric_buf, NUMERIC_BUFFER, format_bits, base, c == 'X', value);
+
+						// isLeft, sign, isZeroPad, isUpper
+						unsigned flags = ((format_flags & 8) << 1) | ((format_flags & 1) << 3) | ((format_flags & 2) << 1) | ((format_flags & 16) >> 3) | (c == 'X');
+						numericBytesWritten += TW_WriteInteger(&numeric_buf[numericBytesWritten], NUMERIC_BUFFER, fmt_min_width, format_bits, base, flags, value);
 						break;
 					}
 					case 'p':
@@ -280,7 +352,7 @@ int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...) {
 						else {
 							numeric_buf[0] = '0';
 							numeric_buf[1] = 'x';
-							numericBytesWritten = 2 + TW_WriteInteger(&numeric_buf[2], NUMERIC_BUFFER, 32, 16, 0, (unsigned)value);
+							numericBytesWritten = 2 + TW_WriteInteger(&numeric_buf[2], NUMERIC_BUFFER, fmt_min_width, 32, 16, 0, (unsigned)value);
 						}
 						break;
 					}
@@ -320,7 +392,7 @@ int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...) {
 						TW_CopyBytes(buf, &numeric_buf[leftInBuffer], numericBytesWritten - leftInBuffer);
 					}
 					else {
-						TW_CopyBytes(buf, numeric_buf, numericBytesWritten);
+						TW_CopyBytes(&buf[pos], numeric_buf, numericBytesWritten);
 						pos += numericBytesWritten;
 					}
 				}
@@ -355,5 +427,5 @@ int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...) {
 	sink->transfer(sink, buf, pos);
 
 	va_end(args);
-	return bytesWritten;
+	return bytesWritten - 1; // don't include null terminator
 }
