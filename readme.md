@@ -86,6 +86,7 @@ Call with `-DTW_WII` to compile for Wii instead.
 	- POSIX file wrapper
 		- open, read, write, flush, close, etc.
 		- file table
+		- mount table (accessible through string path)
 
 Still deciding whether to implement the interface for every IOS module on PPC (eg. ES, STM, etc)...
 

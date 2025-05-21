@@ -28,18 +28,24 @@ static void vblank_handler() {
 	_frame_counter++;
 }
 
+TwVideo _tw_default_video = {0};
+
+TwVideo *TW_GetDefaultVideo(void) {
+	return &_tw_default_video;
+}
+
 static void init_video(TwVideo *params) {
 	_default_font = (TwTermFont) {
 		.data = &_glyph_data[0],
 		.width = _glyph_width,
 		.height = _glyph_height,
-		.bytes_per_glyph = _glyph_size,
+		.bytesPerGlyph = _glyph_size,
 		.count = _glyph_count
 	};
 
 	unsigned short dcr = PEEK_U16(TW_VIDEO_REG_BASE + 2);
 	params->format = (dcr >> 8) & 3;
-	params->is_progressive = (dcr >> 2) & 1;
+	params->isProgressive = (dcr >> 2) & 1;
 
 	unsigned width = 320;
 	unsigned height = params->format == TW_VIDEO_PAL50 ? 574 : 480;
@@ -72,7 +78,7 @@ static void init_video(TwVideo *params) {
 		POKE_U32(TW_VIDEO_REG_BASE + 0x18, 0x40ED40ED);
 		POKE_U32(TW_VIDEO_REG_BASE + 0x30, 0x110701AE);
 		/*
-		if (params->is_progressive) {
+		if (params->isProgressive) {
 			POKE_U16(TW_VIDEO_REG_BASE + 0x2c, 0x0005);
 			POKE_U16(TW_VIDEO_REG_BASE + 0x2e, 0x0176);
 		}
@@ -101,7 +107,7 @@ static void init_video(TwVideo *params) {
 	POKE_U32(TW_VIDEO_REG_BASE + 0x64, 0x00080C0F);
 	POKE_U32(TW_VIDEO_REG_BASE + 0x68, 0x00FF0000);
 	*/
-	POKE_U16(TW_VIDEO_REG_BASE + 0x6c, params->is_progressive);
+	POKE_U16(TW_VIDEO_REG_BASE + 0x6c, params->isProgressive);
 
 	/*
 	POKE_U16(TW_VIDEO_REG_BASE + 0x70, 0x0280);
@@ -110,7 +116,7 @@ static void init_video(TwVideo *params) {
 	*/
 
 	TW_DisableInterrupts();
-	_mode_flags = (params->format == TW_VIDEO_PAL50) | (params->is_progressive << 1);
+	_mode_flags = (params->format == TW_VIDEO_PAL50) | (params->isProgressive << 1);
 	_frame_counter = 0;
 	_changed = 1;
 	TW_SetExternalInterruptHandler(TW_INTERRUPT_BIT_VIDEO, vblank_handler);
@@ -125,6 +131,7 @@ void TW_InitVideo(TwVideo *params) {
 	TW_InitTwilight();
 	if (!_initialized) {
 		init_video(params);
+		_tw_default_video = *params;
 		_initialized = 1;
 	}
 }
@@ -194,7 +201,7 @@ void TW_DrawAsciiSpan(TwVideo *video, TwTermFont *font, unsigned back, unsigned 
 		for (int j = 0; j < w; j++) {
 			char ch = str[(j + (int)x_off) / halfw];
 			int idx = ch < 0x20 || ch > 0x7e ? 0 : ((int)ch - 0x20);
-			int bit_pos = idx * font->bytes_per_glyph * 8 + ((i + (int)y_off) * halfw + ((j + (int)x_off) % halfw)) * 2;
+			int bit_pos = idx * font->bytesPerGlyph * 8 + ((i + (int)y_off) * halfw + ((j + (int)x_off) % halfw)) * 2;
 			int c = (font->data[bit_pos >> 3] >> (6 - (bit_pos & 7))) & 3;
 			int offset = (i + y) * 320 + j + x;
 			video->xfb[offset] = colors[c];
@@ -203,71 +210,142 @@ void TW_DrawAsciiSpan(TwVideo *video, TwTermFont *font, unsigned back, unsigned 
 	}
 }
 
-void TW_WriteTerminalAscii(TwTerminal *params, TwVideo *video, const char *chars, int len) {
+void _tw_handle_ansi_esc(TwTerminal *term, char *escSeq, int seqLen) {
+	
+}
+
+int _tw_read_ansi_esc_bytes(TwTerminal *term, const char *chars, int len) {
+	if (len <= 0)
+		return 0;
+
+	int offset = 0;
+	if (term->ansiEscLen == 0 && chars[0] == 0x1b) {
+		term->ansiEscBuf[term->ansiEscLen++] = 0x1b;
+		offset++;
+	}	
+	while (offset < len && term->ansiEscLen > 0 && term->ansiEscLen < TW_MAX_ANSI_ESC) {
+		if (term->ansiEscLen >= 2) {
+			char c = chars[offset++];
+			term->ansiEscBuf[term->ansiEscLen++] = c;
+			if (c >= '@' && c <= '~') {
+				_tw_handle_ansi_esc(term, term->ansiEscBuf, term->ansiEscLen);
+				term->ansiEscLen = 0;
+				break;
+			}
+		}
+		else {
+			if (chars[offset] != '[') {
+				term->ansiEscLen = 0;
+			}
+			else {
+				term->ansiEscLen++;
+				offset++;
+			}
+		}
+	}
+	if (term->ansiEscLen >= TW_MAX_ANSI_ESC)
+		term->ansiEscLen = 0;
+
+	return offset;
+}
+
+int TW_PrintTerminal(TwTerminal *term, TwVideo *video, const char *chars, int len) {
 	int text_offsets[TERMINAL_ROWS];
 	for (int i = 0; i < TERMINAL_ROWS; i++)
 		text_offsets[i] = 0;
 
-	int line_origin = params->row;
-	int col_origin = params->column;
-	int line = line_origin;
-	int col = col_origin;
-	int limit = len;
+	int offset = 0;
+	int printCount = 0;
+	while (offset < len) {
+		int isAnsiStart = chars[offset] == 0x1b && term->ansiEscLen == 0;
+		if (!isAnsiStart && printCount >= 1)
+			return offset;
 
-	for (int i = 0; i < len; i++) {
-		if (chars[i] == '\n' || (!params->disable_wrap && col >= TERMINAL_COLS - 1)) {
-			col = 0;
-			if (chars[i] == '\n')
-				col--;
-			line++;
-			if (params->disable_scroll && line >= TERMINAL_ROWS) {
+		while ((isAnsiStart || term->ansiEscLen > 0) && offset < len) {
+			isAnsiStart = 0;
+			int processed = _tw_read_ansi_esc_bytes(term, &chars[offset], len - offset);
+			if (processed <= 0)
+				term->ansiEscLen = 0;
+			else
+				offset += processed;
+		}
+		if (offset >= len)
+			return len;
+
+		int line_origin = term->row;
+		int col_origin = term->column;
+		int line = line_origin;
+		int col = col_origin;
+		int limit = len;
+
+		for (int i = offset; i < len; i++) {
+			if (chars[i] == 0x1b) {
 				limit = i;
 				break;
 			}
-			text_offsets[line % TERMINAL_ROWS] = i;
+			if (chars[i] == '\n' || ((term->flags & TW_DISABLE_WRAP) == 0 && col >= TERMINAL_COLS - 1)) {
+				col = 0;
+				if (chars[i] == '\n')
+					col--;
+				line++;
+				if ((term->flags & TW_DISABLE_SCROLL) != 0 && line >= TERMINAL_ROWS) {
+					limit = i;
+					break;
+				}
+				text_offsets[line % TERMINAL_ROWS] = i;
+			}
+			col++;
 		}
-		col++;
-	}
 
-	if (!params->disable_scroll) {
-		int scroll = line - TERMINAL_ROWS - 1;
-		if (scroll > 0) {
-			int delta = 320 * _glyph_height * scroll;
-			for (int i = delta; i < 320 * 480; i++)
-				video->xfb[i-delta] = video->xfb[i];
+		if ((term->flags & TW_DISABLE_SCROLL) == 0) {
+			int scroll = line - TERMINAL_ROWS - 1;
+			if (scroll > 0) {
+				int delta = 320 * _glyph_height * scroll;
+				for (int i = delta; i < 320 * 480; i++) {
+					video->xfb[i-delta] = video->xfb[i];
+					video->xfb[i] = term->back;
+				}
 
-			line_origin -= scroll;
-			if (line_origin < 0) {
-				// maybe do something smart here
-				line_origin = 0;
+				line_origin -= scroll;
+				if (line_origin < 0) {
+					// maybe do something smart here
+					line_origin = 0;
+				}
 			}
 		}
+
+		line = line_origin;
+		int start = text_offsets[line % TERMINAL_ROWS];
+		int home = start;
+		int home_col = col_origin;
+
+		for (int i = start; i < limit; i++) {
+			int is_newline = chars[i] == '\n' || ((term->flags & TW_DISABLE_WRAP) == 0 && col >= TERMINAL_COLS - 1);
+			if (i < limit-1 && !is_newline) {
+				col++;
+				continue;
+			}
+			int r = line % TERMINAL_ROWS;
+
+			TW_DrawAsciiSpan(video, &_default_font, term->back, term->fore, col * _glyph_width, r * _glyph_height, &chars[home], i - home);
+
+			if (chars[i] == '\n') {
+				col = 0;
+				home = i+1;
+			}
+			else {
+				col = 1;
+				home = i;
+			}
+			home_col = 0;
+			line++;
+		}
+
+		term->row = line;
+		term->column = col;
+		printCount++;
+		offset = limit;
 	}
 
-	line = line_origin;
-	int start = text_offsets[line % TERMINAL_ROWS];
-	int home = start;
-	int home_col = col_origin;
-
-	for (int i = start; i < limit; i++) {
-		int is_newline = chars[i] == '\n' || (!params->disable_wrap && col >= TERMINAL_COLS - 1);
-		if (i < limit-1 && !is_newline) {
-			col++;
-			continue;
-		}
-		int r = line % TERMINAL_ROWS;
-
-		TW_DrawAsciiSpan(video, &_default_font, params->back, params->fore, col * _glyph_width, r * _glyph_height, &chars[home], i - home);
-
-		if (chars[i] == '\n') {
-			col = 0;
-			home = i+1;
-		}
-		else {
-			col = 1;
-			home = i;
-		}
-		home_col = 0;
-		line++;
-	}
+	return offset;
 }

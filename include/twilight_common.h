@@ -2,13 +2,14 @@
 
 #include <stdarg.h>
 
-#define MAX_HEAP_RANGES 4
-
 #define PEEK_U16(address) *(volatile unsigned short*)(address)
 #define PEEK_U32(address) *(volatile unsigned int*)(address)
 
 #define POKE_U16(address, value) *(volatile unsigned short*)(address) = value
 #define POKE_U32(address, value) *(volatile unsigned int*)(address) = value
+
+#define MAX_HEAP_RANGES 4
+#define TW_FILES_PER_BUCKET 16
 
 // TODO: Thread local storage for the first N threads that ask for one (eg. N = 4)
 // TODO: Thread pools
@@ -57,12 +58,33 @@ typedef struct {
 	unsigned *values;
 } TwHashMap;
 
+typedef struct {
+	unsigned long long totalSize;
+} TwFileProperties;
+
+struct _tw_file {
+	TwFileProperties (*getProperties)(struct _tw_file *file);
+	TwStream streamRead;
+	TwStream streamWrite;
+	long long (*seek)(struct _tw_file *file, int type, long long seekAmount);
+	int (*flush)(struct _tw_file *file);
+	int (*close)(struct _tw_file *file);
+};
+typedef struct _tw_file TwFile;
+
+struct _tw_file_bucket {
+	TwFile file[TW_FILES_PER_BUCKET];
+	struct _tw_file_bucket *next;
+};
+typedef struct _tw_file_bucket TwFileBucket;
+
 // These must be defined in the architecture implementation, ie. ppc or arm
 extern void *TW_CopyBytes(void *dst, const void *src, int len);
 unsigned TW_DivideU64(unsigned long long *value, unsigned base);
 extern unsigned TW_EnableInterrupts(void);
 extern unsigned TW_DisableInterrupts(void);
 TwHeapAllocator *TW_GetGlobalAllocator(void);
+TwFileBucket *TW_GetFileTable(void);
 
 // structures.c
 // NOT thread-safe -- many of these functions should be locked on the outside in a concurrent context
@@ -86,11 +108,12 @@ int TW_AppendFlexArray(TwFlexArray *array, char *data, int size);
 int TW_ResizeFlexArray(TwFlexArray *array, int newSize);
 
 unsigned TW_GetStringHash(const char *str, int len);
-TwHashMap TW_MakeFixedMap(const char **keys, void **key_slots, unsigned *values, int count);
+TwHashMap TW_MakeFixedMap(const char **keys, void **keySlots, unsigned *values, int count);
 int TW_GetHashMapIndex(TwHashMap *map, const char *key, int len);
 
 // strformat.c
 int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...);
+int TW_WriteInteger(char *outBuf, int maxSize, int minWidth, unsigned bits, unsigned base, unsigned flags, unsigned long long value);
 
 // threading.c
 // TODO: General concurrent objects
@@ -98,3 +121,7 @@ int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...);
 int TW_MultiThreadingEnabled(void);
 void TW_LockMutex(void **mutex);
 void TW_UnlockMutex(void **mutex);
+
+// file.c
+TwFile TW_MakeStdin(int (*read)(TwStream*, char*, int));
+TwFile TW_MakeStdout(int (*write)(TwStream*, char*, int));

@@ -1,22 +1,18 @@
 #include <twilight_ppc.h>
 
-typedef unsigned int u32;
 #define NULL (void*)0
 
+#define COLOR_WHITE 0xff80ff80
+#define COLOR_BLACK 0x00800080
+
+typedef unsigned int u32;
+
 int main() {
-	TwVideo video_params;
-	TW_InitVideo(&video_params);
+	TwVideo videoParams;
+	TW_InitVideo(&videoParams);
 
 	unsigned portMask = 1;
 	TW_SetupSerialDevices(portMask);
-
-	TwTerminal term_params = {
-		.column = 10,
-		.row = 3,
-		.fore = 0xff80ff80,
-		.back = 0x00800080,
-	};
-	term_params.disable_scroll = 1;
 
 	u32 counter = 0;
 	int useCursor = 0;
@@ -51,9 +47,9 @@ int main() {
 			y = -30 + (int)((counter >> 1) % 540);
 		}
 
-		TW_ClearVideoScreen(&video_params, 0x00800080);
-		TW_DrawAsciiSpan(&video_params, NULL, 0x00800080, 0xff80ff80, x, y, "hello", 5);
-		TW_AwaitVideoVBlank(&video_params);
+		TW_ClearVideoScreen(&videoParams, COLOR_BLACK);
+		TW_DrawAsciiSpan(&videoParams, NULL, COLOR_BLACK, COLOR_WHITE, x, y, "hello", 5);
+		TW_AwaitVideoVBlank(&videoParams);
 
 		counter++;
 	}

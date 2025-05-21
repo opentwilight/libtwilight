@@ -61,6 +61,11 @@
 #define TW_VIDEO_PAL50 1
 #define TW_VIDEO_MPAL  2
 
+#define TW_DISABLE_WRAP   1
+#define TW_DISABLE_SCROLL 2
+
+#define TW_MAX_ANSI_ESC 32
+
 #define TW_PPC_COUNT_LEADING_ZEROS(output, input) __asm("cntlzd %0,%1" : "w"(output) : "r"(input))
 
 typedef union {
@@ -87,7 +92,7 @@ typedef struct {
 	int width;
 	int height;
 	int format;
-	int is_progressive;
+	int isProgressive;
 } TwVideo;
 
 typedef struct {
@@ -95,15 +100,16 @@ typedef struct {
 	int row;
 	unsigned fore;
 	unsigned back;
-	int disable_scroll;
-	int disable_wrap;
+	unsigned flags;
+	int ansiEscLen;
+	char ansiEscBuf[TW_MAX_ANSI_ESC];
 } TwTerminal;
 
 typedef struct {
 	const unsigned char *data;
 	int width;
 	int height;
-	int bytes_per_glyph;
+	int bytesPerGlyph;
 	int count;
 } TwTermFont;
 
@@ -113,10 +119,11 @@ unsigned TW_GetFramebufferAddress(int *outSize);
 
 // video.c
 void TW_InitVideo(TwVideo *params);
+TwVideo *TW_GetDefaultVideo(void);
 void TW_AwaitVideoVBlank(TwVideo *params);
 void TW_ClearVideoScreen(TwVideo *params, unsigned color);
 void TW_DrawAsciiSpan(TwVideo *video, TwTermFont *font, unsigned back, unsigned fore, float x, float y, const char *str, int count);
-void TW_WriteTerminalAscii(TwTerminal *params, TwVideo *video, const char *chars, int len);
+int TW_PrintTerminal(TwTerminal *term, TwVideo *video, const char *chars, int len);
 
 // serial.c
 void TW_SetSerialPollInterval(unsigned line, unsigned count);
