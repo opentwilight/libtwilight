@@ -1,7 +1,5 @@
 #include <twilight_common.h>
 
-// #include <stdio.h>
-
 #define FMT_BUFFER 512
 #define NUMERIC_BUFFER 128
 
@@ -9,15 +7,19 @@
 #define DOUBLE_DECIMAL  1
 #define DOUBLE_EXPONENT 2
 
+#define CHANNELS 3
+
 #define SHIFT_DIGITS_RIGHT(amount, to10th) \
 	for (int i = firstDigit; i < endDigit; i++) { \
-		int digits = ((int)buf[i*4 + src] * to10th) >> amount; \
+		char *srcP = &buf[i * CHANNELS + src]; \
+		int digits = ((int)*srcP * to10th) >> amount; \
+		*srcP = 0; \
 		int carry = 0; \
 		int j = i - amount; \
-		while ((digits > 0 || carry > 0) && j < 1384) { \
+		while ((digits > 0 || carry > 0) && j < 1383) { \
 			int d = digits % 10; \
 			digits /= 10; \
-			char *dst = &buf[j*4 + (src^1)]; \
+			char *dst = &buf[j*CHANNELS + (src^1)]; \
 			int a = (int)*dst + d + carry; \
 			*dst = (char)(a % 10); \
 			carry = a / 10; \
@@ -31,40 +33,44 @@
 	int aCarry = 0; \
 	int i = firstDigit; \
 	for ( ; i < endDigit; i++) { \
-		int dM = (((int)buf[i*4 + src]) << amount) + mCarry; \
+		char *srcP = &buf[i * CHANNELS + src]; \
+		int dM = (((int)*srcP) << amount) + mCarry; \
+		*srcP = 0; \
 		mCarry = dM / 10; \
-		char *dst = &buf[i*4 + (src^1)]; \
+		char *dst = &buf[i * CHANNELS + (src^1)]; \
 		int dA = (int)*dst + (dM % 10) + aCarry; \
 		aCarry = dA / 10; \
 		*dst = (char)(dA % 10); \
 	} \
-	while ((mCarry > 0 || aCarry > 0) && i < 1384) { \
+	while ((mCarry > 0 || aCarry > 0) && i < 1383) { \
 		int dM = mCarry; \
 		mCarry = dM / 10; \
 		int dA = (dM % 10) + aCarry; \
-		buf[i*4 + (src^1)] = (char)(dA % 10); \
+		buf[i * CHANNELS + (src^1)] = (char)(dA % 10); \
 		aCarry = dA / 10; \
 		i++; \
 		endDigit++; \
 	} \
+	if (endDigit > 1383) \
+		endDigit = 1383;
 
 #define ADD_MANTISSA_MULTIPLE(dst, src, amount) \
 	int mCarry = 0; \
 	int aCarry = 0; \
 	int j = firstDigit; \
 	for ( ; j < endDigit; j++) { \
-		int dM = (((int)buf[j*4 + src]) << amount) + mCarry; \
+		int dM = (((int)buf[j * CHANNELS + src]) << amount) + mCarry; \
 		mCarry = dM / 10; \
-		char *p = &buf[j*4 + dst]; \
+		char *p = &buf[j * CHANNELS + dst]; \
 		int dA = (int)*p + (dM % 10) + aCarry; \
 		aCarry = dA / 10; \
 		char out = (char)(dA % 10); \
 		*p = out; \
 	} \
-	while ((mCarry > 0 || aCarry > 0) && j < 1384) { \
+	while ((mCarry > 0 || aCarry > 0) && j < 1383) { \
 		int dM = mCarry; \
 		mCarry = dM / 10; \
-		char *p = &buf[j*4 + dst]; \
+		char *p = &buf[j * CHANNELS + dst]; \
 		int dA = (int)*p + (dM % 10) + aCarry; \
 		aCarry = dA / 10; \
 		*p = (char)(dA % 10); \
@@ -73,7 +79,7 @@
 
 // Anyone is welcome to write a more efficient version of this
 int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int mode, double value) {
-	unsigned wBuf[1384];
+	unsigned wBuf[1038];
 	int outPos = 0;
 
 	unsigned long long asU64 = 0;
@@ -114,14 +120,14 @@ int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int m
 		return outPos;
 	}
 
-	for (int i = 0; i < 1384; i++)
+	for (int i = 0; i < 1038; i++)
 		wBuf[i] = 0;
 
 	// the mantissa takes up 52 bits.
 	// 2^-52, without the leading zeroes, reversed.
 	char *buf = (char*)wBuf;
 	for (int i = 0; i < 37; i++)
-		buf[(1022+i)*4] = (char)("5260461816333627480803130529406440222"[i] - '0');
+		buf[(1022+i) * CHANNELS] = (char)("5260461816333627480803130529406440222"[i] - '0');
 
 	int firstDigit = 1022;
 	int endDigit = firstDigit + 37;
@@ -161,6 +167,8 @@ int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int m
 	}
 
 	endDigit += 52;
+	if (endDigit > 1383)
+		endDigit = 1383;
 
 	// the first 27 mantissa bits
 	for (int i = 0; i < 27; i++) {
@@ -175,19 +183,21 @@ int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int m
 		int aCarry = 0;
 		int i = firstDigit;
 		for ( ; i < endDigit; i++) {
-			int dM = (((int)buf[i*4 + src]) << 27) + mCarry;
+			int dM = (((int)buf[i * CHANNELS + src]) << 27) + mCarry;
 			mCarry = dM / 10;
-			buf[i*4 + (src^1)] = (char)(dM % 10);
+			buf[i * CHANNELS + (src^1)] = (char)(dM % 10);
 		}
-		while (mCarry > 0 && i < 1384) {
+		while (mCarry > 0 && i < 1383) {
 			int dM = mCarry;
 			mCarry = dM / 10;
-			buf[i*4 + (src^1)] = (char)(dM % 10);
+			buf[i * CHANNELS + (src^1)] = (char)(dM % 10);
 			i++;
 			endDigit++;
 		}
 		src ^= 1;
 		firstDigit += 27;
+		if (endDigit > 1383)
+			endDigit = 1383;
 	}
 
 	// the next 25 mantissa bits, plus one
@@ -200,7 +210,7 @@ int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int m
 
 	firstDigit -= 27;
 
-	while (buf[endDigit * 4 + 2] == 0 && endDigit > 1074)
+	while (buf[endDigit * CHANNELS + 2] == 0 && endDigit > 1074)
 		endDigit--;
 
 	//printf("firstDigit: %d, endDigit: %d\n", firstDigit, endDigit);
@@ -210,7 +220,7 @@ int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int m
 		char debug[1384];
 		for (int ch = 0; ch < 3; ch++) {
 			for (int i = 0; i < 1383; i++)
-				debug[i] = '0' + buf[(1382-i) * 4 + ch];
+				debug[i] = '0' + buf[(1382-i) * CHANNELS + ch];
 			debug[1383] = 0;
 			printf("channel %d\n", ch);
 			puts(debug);
@@ -226,7 +236,7 @@ int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int m
 		outBuf[outPos++] = '0';
 
 	while (outPos < maxSize && inPos >= 1074 && inPos >= firstDigit) {
-		outBuf[outPos++] = '0' + buf[inPos * 4 + 2];
+		outBuf[outPos++] = '0' + buf[inPos * CHANNELS + 2];
 		inPos--;
 	}
 
@@ -245,7 +255,7 @@ int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int m
 		for (i = 0; i < precision && outPos < maxSize && inPos - i >= 1074; i++)
 			outBuf[outPos++] = '0';
 		for (; i < precision && outPos < maxSize && inPos >= firstDigit; i++) {
-			outBuf[outPos++] = '0' + buf[inPos * 4 + 2];
+			outBuf[outPos++] = '0' + buf[inPos * CHANNELS + 2];
 			inPos--;
 		}
 		for (; i < precision && outPos < maxSize; i++)

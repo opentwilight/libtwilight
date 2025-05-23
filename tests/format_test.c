@@ -25,6 +25,9 @@ int main() {
 	int lenA = 0;
 	int lenB = 0;
 
+	unsigned long long smallDouble = (1ull << 52) | 1ull;
+	unsigned long long bigDouble = (2047ull << 52) - 1ull;
+
 	TEST(__LINE__, "%d", 5)
 	TEST(__LINE__, "%d", 26)
 	TEST(__LINE__, "%03d", 26)
@@ -73,6 +76,11 @@ int main() {
 	TEST(__LINE__, "%f", 0.00390625);
 	TEST(__LINE__, "%f", 0.001953125);
 	TEST(__LINE__, "%f", 1.024 / 99537.0);
+	TEST(__LINE__, "%f", 1024.0 * 1024.0 * 1024.0 * 1000.0);
+	TEST(__LINE__, "%f", *(double*)&smallDouble);
+	TEST(__LINE__, "%f", *(double*)&bigDouble);
+	TEST(__LINE__, "%f", 3.141592653585);
+	TEST(__LINE__, "%f", -3.141592653585);
 
 	return 0;
 }
