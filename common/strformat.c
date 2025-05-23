@@ -1,5 +1,7 @@
 #include <twilight_common.h>
 
+// #include <stdio.h>
+
 #define FMT_BUFFER 512
 #define NUMERIC_BUFFER 128
 
@@ -36,14 +38,15 @@
 		aCarry = dA / 10; \
 		*dst = (char)(dA % 10); \
 	} \
-	while (mCarry > 0 && i < 1384) { \
+	while ((mCarry > 0 || aCarry > 0) && i < 1384) { \
 		int dM = mCarry; \
 		mCarry = dM / 10; \
-		buf[i*4 + (src^1)] = (char)(dM % 10); \
+		int dA = (dM % 10) + aCarry; \
+		buf[i*4 + (src^1)] = (char)(dA % 10); \
+		aCarry = dA / 10; \
 		i++; \
 		endDigit++; \
 	} \
-	firstDigit += amount; \
 
 #define ADD_MANTISSA_MULTIPLE(dst, src, amount) \
 	int mCarry = 0; \
@@ -58,17 +61,14 @@
 		char out = (char)(dA % 10); \
 		*p = out; \
 	} \
-	char prev = 1; \
-	while ((prev != 0 || mCarry > 0 || aCarry > 0) && j < 1384) { \
+	while ((mCarry > 0 || aCarry > 0) && j < 1384) { \
 		int dM = mCarry; \
 		mCarry = dM / 10; \
 		char *p = &buf[j*4 + dst]; \
 		int dA = (int)*p + (dM % 10) + aCarry; \
 		aCarry = dA / 10; \
 		*p = (char)(dA % 10); \
-		prev = *p; \
 		j++; \
-		endDigit++; \
 	}
 
 // Anyone is welcome to write a more efficient version of this
@@ -160,6 +160,8 @@ int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int m
 		}
 	}
 
+	endDigit += 52;
+
 	// the first 27 mantissa bits
 	for (int i = 0; i < 27; i++) {
 		if ((mantissa >> i) & 1ull) {
@@ -198,15 +200,29 @@ int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int m
 
 	firstDigit -= 27;
 
-	endDigit--;
 	while (buf[endDigit * 4 + 2] == 0 && endDigit > 1074)
 		endDigit--;
+
+	//printf("firstDigit: %d, endDigit: %d\n", firstDigit, endDigit);
+
+	/*
+	if (0) {
+		char debug[1384];
+		for (int ch = 0; ch < 3; ch++) {
+			for (int i = 0; i < 1383; i++)
+				debug[i] = '0' + buf[(1382-i) * 4 + ch];
+			debug[1383] = 0;
+			printf("channel %d\n", ch);
+			puts(debug);
+		}
+	}
+	*/
 
 	int inPos = endDigit;
 	if (minWidth < 1)
 		minWidth = 1;
 
-	for (int i = 0; i < minWidth && inPos < 1074 + minWidth - i && outPos < maxSize; i++)
+	for (int i = 0; i < minWidth && inPos < 1074 + minWidth - i - 1 && outPos < maxSize; i++)
 		outBuf[outPos++] = '0';
 
 	while (outPos < maxSize && inPos >= 1074 && inPos >= firstDigit) {
@@ -214,7 +230,7 @@ int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int m
 		inPos--;
 	}
 
-	if (firstDigit > 1074) {
+	if (inPos > 1074) {
 		for (int i = 0; i < firstDigit - 1074 && outPos < maxSize; i++)
 			outBuf[outPos++] = '0';
 		if (outPos < maxSize)
@@ -226,13 +242,20 @@ int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int m
 		if (outPos < maxSize)
 			outBuf[outPos++] = '.';
 		int i;
-		for (i = 0; i < precision && outPos < maxSize && inPos >= firstDigit; i++) {
-			outBuf[outPos++] = '0' + buf[(inPos-i) * 4 + 2];
+		for (i = 0; i < precision && outPos < maxSize && inPos - i >= 1074; i++)
+			outBuf[outPos++] = '0';
+		for (; i < precision && outPos < maxSize && inPos >= firstDigit; i++) {
+			outBuf[outPos++] = '0' + buf[inPos * 4 + 2];
 			inPos--;
 		}
-		for (; i < precision && outPos < maxSize && inPos - i >= 1074; i++)
+		for (; i < precision && outPos < maxSize; i++)
 			outBuf[outPos++] = '0';
 	}
+
+	/*
+	outBuf[outPos] = 0;
+	puts(outBuf);
+	*/
 
 	return outPos;
 }

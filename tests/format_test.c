@@ -64,7 +64,15 @@ int main() {
 	TEST(__LINE__, "a%dc", -26)
 	TEST(__LINE__, "%*d", 5, 67);
 	TEST(__LINE__, "Hello %s! Nice to meet you.", "there");
+	TEST(__LINE__, "%f", 1.0);
+	TEST(__LINE__, "%f", 1.00001);
+	TEST(__LINE__, "%f", 1024.0 * 1024.0 * 100.0);
 	TEST(__LINE__, "%f", 1500.0 / 18.0);
+	TEST(__LINE__, "%f", 0.28);
+	TEST(__LINE__, "%f", 0.0078125);
+	TEST(__LINE__, "%f", 0.00390625);
+	TEST(__LINE__, "%f", 0.001953125);
+	TEST(__LINE__, "%f", 1.024 / 99537.0);
 
 	return 0;
 }
