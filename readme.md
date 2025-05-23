@@ -24,8 +24,6 @@ Call with `-DTW_WII` to compile for Wii instead.
 	- String formatter
 	- XFB terminal printing (including ANSI escape codes)
 - Optionally blend XFB text with background
-- Finish heap allocator
-	- List of disjoint pools, eg. one for MEM1 and MEM2
 - Friendly DSI and ISI exception crash handler (segfault)
 	- With future plans to implement lazy loading within these handlers
 - Return to loader on return from main()

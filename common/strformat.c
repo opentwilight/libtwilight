@@ -1,15 +1,240 @@
 #include <twilight_common.h>
 
 #define FMT_BUFFER 512
-#define NUMERIC_BUFFER 64
+#define NUMERIC_BUFFER 128
 
-#define DOUBLE_AUTO       0
-#define DOUBLE_SCIENTIFIC 1
-#define DOUBLE_DECIMAL    2
-#define DOUBLE_HEX        3
+#define DOUBLE_AUTO     0
+#define DOUBLE_DECIMAL  1
+#define DOUBLE_EXPONENT 2
 
+#define SHIFT_DIGITS_RIGHT(amount, to10th) \
+	for (int i = firstDigit; i < endDigit; i++) { \
+		int digits = ((int)buf[i*4 + src] * to10th) >> amount; \
+		int carry = 0; \
+		int j = i - amount; \
+		while ((digits > 0 || carry > 0) && j < 1384) { \
+			int d = digits % 10; \
+			digits /= 10; \
+			char *dst = &buf[j*4 + (src^1)]; \
+			int a = (int)*dst + d + carry; \
+			*dst = (char)(a % 10); \
+			carry = a / 10; \
+			j++; \
+		} \
+	} \
+	firstDigit -= amount;
+
+#define SHIFT_DIGITS_LEFT(amount) \
+	int mCarry = 0; \
+	int aCarry = 0; \
+	int i = firstDigit; \
+	for ( ; i < endDigit; i++) { \
+		int dM = (((int)buf[i*4 + src]) << amount) + mCarry; \
+		mCarry = dM / 10; \
+		char *dst = &buf[i*4 + (src^1)]; \
+		int dA = (int)*dst + (dM % 10) + aCarry; \
+		aCarry = dA / 10; \
+		*dst = (char)(dA % 10); \
+	} \
+	while (mCarry > 0 && i < 1384) { \
+		int dM = mCarry; \
+		mCarry = dM / 10; \
+		buf[i*4 + (src^1)] = (char)(dM % 10); \
+		i++; \
+		endDigit++; \
+	} \
+	firstDigit += amount; \
+
+#define ADD_MANTISSA_MULTIPLE(dst, src, amount) \
+	int mCarry = 0; \
+	int aCarry = 0; \
+	int j = firstDigit; \
+	for ( ; j < endDigit; j++) { \
+		int dM = (((int)buf[j*4 + src]) << amount) + mCarry; \
+		mCarry = dM / 10; \
+		char *p = &buf[j*4 + dst]; \
+		int dA = (int)*p + (dM % 10) + aCarry; \
+		aCarry = dA / 10; \
+		char out = (char)(dA % 10); \
+		*p = out; \
+	} \
+	char prev = 1; \
+	while ((prev != 0 || mCarry > 0 || aCarry > 0) && j < 1384) { \
+		int dM = mCarry; \
+		mCarry = dM / 10; \
+		char *p = &buf[j*4 + dst]; \
+		int dA = (int)*p + (dM % 10) + aCarry; \
+		aCarry = dA / 10; \
+		*p = (char)(dA % 10); \
+		prev = *p; \
+		j++; \
+		endDigit++; \
+	}
+
+// Anyone is welcome to write a more efficient version of this
 int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int mode, double value) {
-	return 0;
+	unsigned wBuf[1384];
+	int outPos = 0;
+
+	unsigned long long asU64 = 0;
+	*(double*)&asU64 = value;
+	int exponent = (asU64 >> 52) & 0x7ff;
+	unsigned long long mantissa = asU64 & 0x000FffffFFFFffffULL;
+
+	if (asU64 >> 63) {
+		outBuf[outPos++] = '-';
+	}
+	if (exponent == 0) {
+		// TODO: if mantissa, handle subnormals
+		if (minWidth < 1)
+			minWidth = 1;
+		if (precision < 1)
+			precision = 1;
+
+		for (int i = 0; i < minWidth && outPos < maxSize; i++)
+			outBuf[outPos++] = '0';
+		if (outPos < maxSize)
+			outBuf[outPos++] = '.';
+		for (int i = 0; i < precision && outPos < maxSize; i++)
+			outBuf[outPos++] = '0';
+
+		return outPos;
+	}
+	if (exponent == 0x7ff) {
+		if (mantissa) {
+			if (outPos < maxSize) outBuf[outPos++] = 'n';
+			if (outPos < maxSize) outBuf[outPos++] = 'a';
+			if (outPos < maxSize) outBuf[outPos++] = 'n';
+		}
+		else {
+			if (outPos < maxSize) outBuf[outPos++] = 'i';
+			if (outPos < maxSize) outBuf[outPos++] = 'n';
+			if (outPos < maxSize) outBuf[outPos++] = 'f';
+		}
+		return outPos;
+	}
+
+	for (int i = 0; i < 1384; i++)
+		wBuf[i] = 0;
+
+	// the mantissa takes up 52 bits.
+	// 2^-52, without the leading zeroes, reversed.
+	char *buf = (char*)wBuf;
+	for (int i = 0; i < 37; i++)
+		buf[(1022+i)*4] = (char)("5260461816333627480803130529406440222"[i] - '0');
+
+	int firstDigit = 1022;
+	int endDigit = firstDigit + 37;
+	int src = 0;
+	int intervalShift = exponent - 1023;
+
+	if (intervalShift < 0) {
+		// shift right
+		int toShift = -intervalShift;
+		// the trick here is to provide enough zeroes to perform a right shift in a 32-bit integer without losing fractional bits.
+		// this means we can only shift 8 at a time, instead of 27.
+		while (toShift >= 8) {
+			SHIFT_DIGITS_RIGHT(8, 100000000)
+			src ^= 1;
+			toShift -= 8;
+		}
+		if (toShift > 0) {
+			int power = 1;
+			for (int i = 0; i < toShift; i++)
+				power *= 10;
+			SHIFT_DIGITS_RIGHT(toShift, power)
+			src ^= 1;
+		}
+	}
+	else if (intervalShift > 0) {
+		// shift left
+		int toShift = intervalShift;
+		while (toShift >= 27) {
+			SHIFT_DIGITS_LEFT(27)
+			src ^= 1;
+			toShift -= 27;
+		}
+		if (toShift > 0) {
+			SHIFT_DIGITS_LEFT(toShift)
+			src ^= 1;
+		}
+	}
+
+	// the first 27 mantissa bits
+	for (int i = 0; i < 27; i++) {
+		if ((mantissa >> i) & 1ull) {
+			ADD_MANTISSA_MULTIPLE(2, src, i)
+		}
+	}
+
+	// shift the interval up by 27 bits (so we can still use 32-bit numbers, which speeds up division by 10)
+	{
+		int mCarry = 0;
+		int aCarry = 0;
+		int i = firstDigit;
+		for ( ; i < endDigit; i++) {
+			int dM = (((int)buf[i*4 + src]) << 27) + mCarry;
+			mCarry = dM / 10;
+			buf[i*4 + (src^1)] = (char)(dM % 10);
+		}
+		while (mCarry > 0 && i < 1384) {
+			int dM = mCarry;
+			mCarry = dM / 10;
+			buf[i*4 + (src^1)] = (char)(dM % 10);
+			i++;
+			endDigit++;
+		}
+		src ^= 1;
+		firstDigit += 27;
+	}
+
+	// the next 25 mantissa bits, plus one
+	for (int i = 0; i < 26; i++) {
+		// the mantissa encoding excludes the top bit, so the "i == 25 ||" adds it back in
+		if (i == 25 || ((mantissa >> (27+i)) & 1ull)) {
+			ADD_MANTISSA_MULTIPLE(2, src, i)
+		}
+	}
+
+	firstDigit -= 27;
+
+	endDigit--;
+	while (buf[endDigit * 4 + 2] == 0 && endDigit > 1074)
+		endDigit--;
+
+	int inPos = endDigit;
+	if (minWidth < 1)
+		minWidth = 1;
+
+	for (int i = 0; i < minWidth && inPos < 1074 + minWidth - i && outPos < maxSize; i++)
+		outBuf[outPos++] = '0';
+
+	while (outPos < maxSize && inPos >= 1074 && inPos >= firstDigit) {
+		outBuf[outPos++] = '0' + buf[inPos * 4 + 2];
+		inPos--;
+	}
+
+	if (firstDigit > 1074) {
+		for (int i = 0; i < firstDigit - 1074 && outPos < maxSize; i++)
+			outBuf[outPos++] = '0';
+		if (outPos < maxSize)
+			outBuf[outPos++] = '.';
+		for (int i = 0; i < precision && outPos < maxSize; i++)
+			outBuf[outPos++] = '0';
+	}
+	else {
+		if (outPos < maxSize)
+			outBuf[outPos++] = '.';
+		int i;
+		for (i = 0; i < precision && outPos < maxSize && inPos >= firstDigit; i++) {
+			outBuf[outPos++] = '0' + buf[(inPos-i) * 4 + 2];
+			inPos--;
+		}
+		for (; i < precision && outPos < maxSize && inPos - i >= 1074; i++)
+			outBuf[outPos++] = '0';
+	}
+
+	return outPos;
 }
 
 int TW_WriteInteger(char *outBuf, int maxSize, int minWidth, unsigned bits, unsigned base, unsigned flags, unsigned long long value) {
@@ -238,8 +463,9 @@ int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...) {
 					case 'A':
 					{
 						// hex float
+						// we don't support hex float, so this just prints the float in regular decimal notation
 						double value = va_arg(args, double);
-						numericBytesWritten = TW_WriteDouble(numeric_buf, NUMERIC_BUFFER, fmt_min_width, fmt_precision, DOUBLE_HEX, value);
+						numericBytesWritten = TW_WriteDouble(numeric_buf, NUMERIC_BUFFER, fmt_min_width, fmt_precision, DOUBLE_DECIMAL, value);
 						break;
 					}
 					case 'c':
@@ -282,7 +508,7 @@ int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...) {
 					{
 						// decimal float
 						double value = va_arg(args, double);
-						numericBytesWritten = TW_WriteDouble(numeric_buf, NUMERIC_BUFFER, fmt_min_width, fmt_precision, DOUBLE_DECIMAL, value);
+						numericBytesWritten = TW_WriteDouble(numeric_buf, NUMERIC_BUFFER, fmt_min_width, fmt_precision, DOUBLE_EXPONENT, value);
 						break;
 					}
 					case 'f':
@@ -290,7 +516,9 @@ int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...) {
 					{
 						// float
 						double value = va_arg(args, double);
-						numericBytesWritten = TW_WriteDouble(numeric_buf, NUMERIC_BUFFER, fmt_min_width, fmt_precision, DOUBLE_SCIENTIFIC, value);
+						if (fmt_precision == 0)
+							fmt_precision = 6;
+						numericBytesWritten = TW_WriteDouble(numeric_buf, NUMERIC_BUFFER, fmt_min_width, fmt_precision, DOUBLE_DECIMAL, value);
 						break;
 					}
 					case 'g':
