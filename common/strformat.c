@@ -1,7 +1,7 @@
 #include <twilight_common.h>
 
 #define FMT_BUFFER 512
-#define NUMERIC_BUFFER 128
+#define NUMERIC_BUFFER 1536
 
 #define DOUBLE_AUTO     0
 #define DOUBLE_DECIMAL  1
@@ -209,6 +209,19 @@ int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int m
 	}
 
 	firstDigit -= 27;
+
+	int roundDigit = 1074 - precision - 1;
+	if (buf[roundDigit * CHANNELS + 2] > 5) {
+		int carry = 0;
+		int inc = 1;
+		do {
+			char *p = &buf[++roundDigit * CHANNELS + 2];
+			int d = (int)*p + inc + carry;
+			carry = d / 10;
+			*p = (char)(d % 10);
+			inc = 0;
+		} while (carry && roundDigit < 1383);
+	}
 
 	while (buf[endDigit * CHANNELS + 2] == 0 && endDigit > 1074)
 		endDigit--;
@@ -642,18 +655,20 @@ int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...) {
 					default:
 						break;
 				}
-				if (numericBytesWritten > 0) {
+				int offset = 0;
+				while (offset < numericBytesWritten) {
 					int leftInBuffer = FMT_BUFFER - pos;
-					if (leftInBuffer < numericBytesWritten) {
-						TW_CopyBytes(&buf[pos], numeric_buf, leftInBuffer);
+					if (leftInBuffer < numericBytesWritten - offset) {
+						TW_CopyBytes(&buf[pos], &numeric_buf[offset], leftInBuffer);
 						sink->transfer(sink, buf, pos);
 						flushes++;
 						pos = 0;
-						TW_CopyBytes(buf, &numeric_buf[leftInBuffer], numericBytesWritten - leftInBuffer);
+						offset += leftInBuffer;
 					}
 					else {
-						TW_CopyBytes(&buf[pos], numeric_buf, numericBytesWritten);
-						pos += numericBytesWritten;
+						TW_CopyBytes(&buf[pos], &numeric_buf[offset], numericBytesWritten - offset);
+						pos += numericBytesWritten - offset;
+						offset = numericBytesWritten;
 					}
 				}
 				format_mode = 0;
