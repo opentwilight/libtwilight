@@ -1,4 +1,4 @@
-#include <twilight_common.h>
+#include <twilight.h>
 
 static TwFileProperties _defaultGetProperties(TwFile *file) {
 	TwFileProperties empty = {0};

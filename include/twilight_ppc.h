@@ -1,6 +1,6 @@
 #pragma once
 
-#include "twilight_common.h"
+#include "twilight.h"
 
 #define POKE_SPR(nStr, valueVar) __asm("mtspr " nStr ", %0" : : "b"(valueVar))
 

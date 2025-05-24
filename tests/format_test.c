@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../include/twilight_common.h"
+#include "../include/twilight.h"
 
 extern void initTestingGlobalAllocator();
 
