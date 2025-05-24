@@ -20,7 +20,7 @@ static int _tw_stdin_read(TwStream *stream, char *buf, int size) {
 }
 
 static int _tw_stdout_write(TwStream *stream, char *buf, int size) {
-	return TW_PrintTerminal(&_g_default_terminal, TW_GetDefaultVideo(), buf, size);
+	return TW_PrintTerminal(&_g_default_terminal, (void*)0, TW_GetDefaultVideo(), buf, size);
 }
 
 static void init_twilight() {

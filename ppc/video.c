@@ -4,6 +4,18 @@
 #define TERMINAL_COLS 80
 #define TERMINAL_ROWS 30
 
+#define BOUNDS_CHECK_COLUMN(term) \
+	if (term->column < 0) \
+		term->column = 0; \
+	if (term->column >= TERMINAL_COLS) \
+		term->column = TERMINAL_COLS - 1; \
+
+#define BOUNDS_CHECK_ROW(term) \
+	if (term->row < 0) \
+		term->row = 0; \
+	if (term->row >= TERMINAL_ROWS) \
+		term->row = TERMINAL_ROWS - 1; \
+
 static int _initialized = 0;
 static TwTermFont _default_font;
 static char _padding[32];
@@ -155,10 +167,33 @@ void TW_AwaitVideoVBlank(TwVideo *params) {
 }
 
 void TW_ClearVideoScreen(TwVideo *params, unsigned color) {
-	unsigned *xfb = params->xfb;
-	TW_FillWordsAndFlush((unsigned*)params->xfb, color, 320 * 480);
+	TW_FillWordsAndFlush(params->xfb, color, 320 * 480);
 }
 
+void TW_ClearVideoRectangle(TwVideo *params, unsigned color, int x, int y, int w, int h) {
+	if (x < 0) {
+		w += x;
+		x = 0;
+	}
+	if (y < 0) {
+		h += y;
+		y = 0;
+	}
+	if (x + w > 320)
+		w = 320 - x;
+	if (y + h > 480)
+		h = 480 - y;
+
+	if (w <= 0 || h <= 0)
+		return;
+
+	unsigned *xfb = params->xfb;
+	for (int i = 0; i < h; i++)
+		TW_FillWordsAndFlush(&xfb[(y+i)*w+x], color, w);
+}
+
+// TODO: actually handle fractional x and y rather than just convert to int
+// And maybe handle x & y scaling and rotation in a separate code path?
 void TW_DrawAsciiSpan(TwVideo *video, TwTermFont *font, unsigned back, unsigned fore, float x, float y, const char *str, int count) {
 	if (!font)
 		font = &_default_font;
@@ -210,11 +245,120 @@ void TW_DrawAsciiSpan(TwVideo *video, TwTermFont *font, unsigned back, unsigned 
 	}
 }
 
-void _tw_handle_ansi_esc(TwTerminal *term, char *escSeq, int seqLen) {
-	
+void _tw_handle_ansi_esc(TwTerminal *term, TwTermFont *font, TwVideo *video, char *escSeq, int seqLen) {
+	int part = 0;
+	int curNm = 0;
+	int numeric[8];
+	for (int i = 0; i < 8; i++)
+		numeric[i] = 0;
+
+	// It's assumed that if this function is called, then the first two bytes are the ANSI escape sequence (0x1b 0x5b)
+	for (int i = 2; i < seqLen; i++) {
+		if (escSeq[i] >= '0' && escSeq[i] <= '9') {
+			numeric[curNm] = numeric[curNm] * 10 + escSeq[i] - '0';
+			continue;
+		}
+		switch (escSeq[i]) {
+			case ';':
+				if (curNm < 7)
+					curNm++;
+				break;
+			case 'H': // Move to row;column
+			case 'f':
+				term->row = numeric[0];
+				term->column = numeric[1];
+				BOUNDS_CHECK_ROW(term)
+				BOUNDS_CHECK_COLUMN(term)
+				return;
+			case 'A': // Move up
+			case 'F':
+				if (numeric[0] <= 0)
+					numeric[0] = 1;
+				term->row -= numeric[0];
+				BOUNDS_CHECK_ROW(term)
+				if (escSeq[i] == 'F')
+					term->column = 0;
+				return;
+			case 'B': // Move down
+			case 'E':
+				if (numeric[0] <= 0)
+					numeric[0] = 1;
+				term->row += numeric[0];
+				BOUNDS_CHECK_ROW(term)
+				if (escSeq[i] == 'E')
+					term->column = 0;
+				return;
+			case 'C':  // Move right
+				if (numeric[0] <= 0)
+					numeric[0] = 1;
+				term->column += numeric[0];
+				BOUNDS_CHECK_COLUMN(term)
+				return;
+			case 'D':  // Move left
+				if (numeric[0] <= 0)
+					numeric[0] = 1;
+				term->column -= numeric[0];
+				BOUNDS_CHECK_COLUMN(term)
+				return;
+			case 'G':  // Move to column
+				term->column = numeric[0];
+				BOUNDS_CHECK_COLUMN(term)
+				return;
+			case 'J':
+			case 'K':
+				if (numeric[0] == 0) {
+					TW_ClearVideoRectangle(
+						video,
+						term->back,
+						term->column * font->width,
+						term->row * font->height,
+						320 - term->column * font->width,
+						font->height
+					);
+					if (escSeq[i] == 'J')
+						TW_ClearVideoRectangle(video, term->back, 0, 0, 320, term->row * font->height);
+				}
+				else if (numeric[0] == 1) {
+					TW_ClearVideoRectangle(
+						video,
+						term->back,
+						0,
+						term->row * font->height,
+						term->column * font->width,
+						font->height
+					);
+					if (escSeq[i] == 'J') {
+						TW_ClearVideoRectangle(
+							video,
+							term->back,
+							0,
+							(term->row + 1) * font->height,
+							320,
+							480 - (term->row + 1) * font->height
+						);
+					}
+				}
+				else if (numeric[0] == 2 || numeric[0] == 3) {
+					if (escSeq[i] == 'J')
+						TW_ClearVideoScreen(video, term->back);
+					else
+						TW_ClearVideoRectangle(video, term->back, 0, term->row * font->height, 320, font->height);
+				}
+				return;
+			case 'm':
+				if (numeric[0] == 0) {
+					term->fore = 0xff80ff80;
+					term->back = 0x00800080;
+				}
+				else if (numeric[0] == 1) {
+					
+				}
+				return;
+		}
+	}
 }
 
-int _tw_read_ansi_esc_bytes(TwTerminal *term, const char *chars, int len) {
+int _tw_read_ansi_esc_bytes(TwTerminal *term, TwTermFont *font, TwVideo *video, const char *chars, int len) {
 	if (len <= 0)
 		return 0;
 
@@ -228,7 +372,7 @@ int _tw_read_ansi_esc_bytes(TwTerminal *term, const char *chars, int len) {
 			char c = chars[offset++];
 			term->ansiEscBuf[term->ansiEscLen++] = c;
 			if (c >= '@' && c <= '~') {
-				_tw_handle_ansi_esc(term, term->ansiEscBuf, term->ansiEscLen);
+				_tw_handle_ansi_esc(term, font, video, term->ansiEscBuf, term->ansiEscLen);
 				term->ansiEscLen = 0;
 				break;
 			}
@@ -249,7 +393,10 @@ int _tw_read_ansi_esc_bytes(TwTerminal *term, const char *chars, int len) {
 	return offset;
 }
 
-int TW_PrintTerminal(TwTerminal *term, TwVideo *video, const char *chars, int len) {
+int TW_PrintTerminal(TwTerminal *term, TwTermFont *font, TwVideo *video, const char *chars, int len) {
+	if (!font)
+		font = &_default_font;
+
 	int text_offsets[TERMINAL_ROWS];
 	for (int i = 0; i < TERMINAL_ROWS; i++)
 		text_offsets[i] = 0;
@@ -263,7 +410,7 @@ int TW_PrintTerminal(TwTerminal *term, TwVideo *video, const char *chars, int le
 
 		while ((isAnsiStart || term->ansiEscLen > 0) && offset < len) {
 			isAnsiStart = 0;
-			int processed = _tw_read_ansi_esc_bytes(term, &chars[offset], len - offset);
+			int processed = _tw_read_ansi_esc_bytes(term, font, video, &chars[offset], len - offset);
 			if (processed <= 0)
 				term->ansiEscLen = 0;
 			else
@@ -283,11 +430,12 @@ int TW_PrintTerminal(TwTerminal *term, TwVideo *video, const char *chars, int le
 				limit = i;
 				break;
 			}
-			if (chars[i] == '\n' || ((term->flags & TW_DISABLE_WRAP) == 0 && col >= TERMINAL_COLS - 1)) {
+			if (chars[i] == '\r' || chars[i] == '\n' || ((term->flags & TW_DISABLE_WRAP) == 0 && col >= TERMINAL_COLS - 1)) {
 				col = 0;
-				if (chars[i] == '\n')
+				if (chars[i] == '\r' || chars[i] == '\n')
 					col--;
-				line++;
+				if (chars[i] != '\r')
+					line++;
 				if ((term->flags & TW_DISABLE_SCROLL) != 0 && line >= TERMINAL_ROWS) {
 					limit = i;
 					break;
@@ -300,7 +448,7 @@ int TW_PrintTerminal(TwTerminal *term, TwVideo *video, const char *chars, int le
 		if ((term->flags & TW_DISABLE_SCROLL) == 0) {
 			int scroll = line - TERMINAL_ROWS - 1;
 			if (scroll > 0) {
-				int delta = 320 * _glyph_height * scroll;
+				int delta = 320 * font->height * scroll;
 				for (int i = delta; i < 320 * 480; i++) {
 					video->xfb[i-delta] = video->xfb[i];
 					video->xfb[i] = term->back;
@@ -320,14 +468,14 @@ int TW_PrintTerminal(TwTerminal *term, TwVideo *video, const char *chars, int le
 		int home_col = col_origin;
 
 		for (int i = start; i < limit; i++) {
-			int is_newline = chars[i] == '\n' || ((term->flags & TW_DISABLE_WRAP) == 0 && col >= TERMINAL_COLS - 1);
+			int is_newline = chars[i] == '\r' || chars[i] == '\n' || ((term->flags & TW_DISABLE_WRAP) == 0 && col >= TERMINAL_COLS - 1);
 			if (i < limit-1 && !is_newline) {
 				col++;
 				continue;
 			}
 			int r = line % TERMINAL_ROWS;
 
-			TW_DrawAsciiSpan(video, &_default_font, term->back, term->fore, col * _glyph_width, r * _glyph_height, &chars[home], i - home);
+			TW_DrawAsciiSpan(video, font, term->back, term->fore, col * font->width, r * font->height, &chars[home], i - home);
 
 			if (chars[i] == '\n') {
 				col = 0;
@@ -338,7 +486,8 @@ int TW_PrintTerminal(TwTerminal *term, TwVideo *video, const char *chars, int le
 				home = i;
 			}
 			home_col = 0;
-			line++;
+			if (chars[i] != '\r')
+				line++;
 		}
 
 		term->row = line;

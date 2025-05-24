@@ -123,7 +123,7 @@ TwVideo *TW_GetDefaultVideo(void);
 void TW_AwaitVideoVBlank(TwVideo *params);
 void TW_ClearVideoScreen(TwVideo *params, unsigned color);
 void TW_DrawAsciiSpan(TwVideo *video, TwTermFont *font, unsigned back, unsigned fore, float x, float y, const char *str, int count);
-int TW_PrintTerminal(TwTerminal *term, TwVideo *video, const char *chars, int len);
+int TW_PrintTerminal(TwTerminal *term, TwTermFont *font, TwVideo *video, const char *chars, int len);
 
 // serial.c
 void TW_SetSerialPollInterval(unsigned line, unsigned count);

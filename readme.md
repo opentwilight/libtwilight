@@ -20,14 +20,10 @@ Call with `-DTW_WII` to compile for Wii instead.
 
 ## Immediate TODO
 
-- Finish printf() building blocks
-	- String formatter
-	- XFB terminal printing (including ANSI escape codes)
 - Optionally blend XFB text with background
 - Friendly DSI and ISI exception crash handler (segfault)
 	- With future plans to implement lazy loading within these handlers
 - Return to loader on return from main()
-- Basic maths functions (similar to list in C standard math.h)
 - Start work on custom libc implementation that wraps libtwilight
 	- libtwilight **must not** depend on libc, libc must depend on libtwilight
 	- limited POSIX
@@ -35,6 +31,7 @@ Call with `-DTW_WII` to compile for Wii instead.
 ## Secondary TODO
 
 - Finish libc
+- Basic maths functions (similar to list in C standard math.h)
 - Custom threading implementation
 	- Use decrement register for scheduling software interrupts
 	- Synchronisation primitives (atomics, semaphores, etc)
