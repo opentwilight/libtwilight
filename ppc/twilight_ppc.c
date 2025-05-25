@@ -62,3 +62,39 @@ TwHeapAllocator *TW_GetGlobalAllocator(void) {
 TwFileBucket *TW_GetFileTable(void) {
 	return &_g_first_files;
 }
+
+int TW_Printf(const char *fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+
+	TwStream sink = (TwStream) { .transfer = _tw_stdout_write };
+	int written = TW_FormatStringV(&sink, 0, fmt, args);
+
+	va_end(args);
+	return written;
+}
+
+void _tw_print_regs(void) {
+	unsigned *regs = TW_GetStoredRegistersAddress();
+	for (int i = 0; i < 32; i++)
+		TW_Printf("\x1b[%d;2Hr%d: %08X", 4 + i, i, regs[i]);
+}
+
+void _tw_default_dsi_handler(void) {
+	TW_ClearVideoScreen(TW_GetDefaultVideo(), 0x00800080);
+	TW_Printf("\x1b[2;2HData access error");
+	_tw_print_regs();
+	while (1);
+}
+
+void _tw_default_isi_handler(void) {
+	TW_ClearVideoScreen(TW_GetDefaultVideo(), 0x00800080);
+	TW_Printf("\x1b[2;2HInstruction access error");
+	_tw_print_regs();
+	while (1);
+}
+
+void TW_SetDefaultCrashHandlers(void) {
+	TW_SetCpuInterruptHandler(TW_INTERRUPT_TYPE_DSI, _tw_default_dsi_handler);
+	TW_SetCpuInterruptHandler(TW_INTERRUPT_TYPE_ISI, _tw_default_isi_handler);
+}

@@ -77,7 +77,6 @@
 		j++; \
 	}
 
-// Anyone is welcome to write a more efficient version of this
 int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int mode, double value) {
 	unsigned wBuf[1038];
 	int outPos = 0;
@@ -352,10 +351,7 @@ int TW_WriteInteger(char *outBuf, int maxSize, int minWidth, unsigned bits, unsi
 	return outPos;
 }
 
-int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...) {
-	va_list args;
-	va_start(args, str);
-
+int TW_FormatStringV(TwStream *sink, int maxOutputSize, const char *str, va_list args) {
 	char buf[FMT_BUFFER];
 	char numeric_buf[NUMERIC_BUFFER];
 	int pos = 0;
@@ -701,6 +697,13 @@ int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...) {
 	int bytesWritten = flushes * FMT_BUFFER + pos;
 	sink->transfer(sink, buf, pos);
 
-	va_end(args);
 	return bytesWritten - 1; // don't include null terminator
+}
+
+int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...) {
+	va_list args;
+	va_start(args, str);
+	int written = TW_FormatStringV(sink, maxOutputSize, str, args);
+	va_end(args);
+	return written;
 }

@@ -40,6 +40,20 @@
 #define TW_INTERRUPT_BIT_RESET      1
 #define TW_INTERRUPT_BIT_ERROR      0
 
+#define TW_INTERRUPT_TYPE_RESET           1
+#define TW_INTERRUPT_TYPE_MACH_CHECK      2
+#define TW_INTERRUPT_TYPE_DSI             3
+#define TW_INTERRUPT_TYPE_ISI             4
+#define TW_INTERRUPT_TYPE_EXTERNAL        5
+#define TW_INTERRUPT_TYPE_ALIGNMENT       6
+#define TW_INTERRUPT_TYPE_PROGRAM         7
+#define TW_INTERRUPT_TYPE_FP_UNAVAILABLE  8
+#define TW_INTERRUPT_TYPE_DECREMENTER     9
+#define TW_INTERRUPT_TYPE_SYSCALL        12
+#define TW_INTERRUPT_TYPE_TRACE          13
+#define TW_INTERRUPT_TYPE_FP_ASSIST      14
+#define TW_INTERRUPT_TYPE_INS_BREAKPOINT 15
+
 #define TW_MEM1_START 0x80000000
 #define TW_MEM1_END   0x81800000
 #define TW_MEM2_START 0x90000000
@@ -154,3 +168,4 @@ extern void *TW_FillWordsAndFlush(void *ptr, unsigned value, int words);
 extern unsigned TW_CountLeadingZeros(unsigned value);
 extern int TW_CountBits(unsigned value);
 extern int TW_HasOneBitSet(unsigned value);
+extern unsigned *TW_GetStoredRegistersAddress(void);

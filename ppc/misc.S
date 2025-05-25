@@ -202,6 +202,19 @@ _tw_divu64_after_upper_rem:
 	addi 1, 1, 16
 	blr
 
+.globl TW_GetStoredRegistersAddress
+TW_GetStoredRegistersAddress:
+	lis 3, __tw_interrupt_stack_top@ha
+	addi 3, 3, __tw_interrupt_stack_top@l
+	addic 3, 3, -208
+	blr
+
+__tw_interrupt_call_scratch:
+	.long 0 // r3
+	.long 0 // LR
+	.long 0 // SRR0
+	.long 0 // SRR1
+
 .globl __tw_external_interrupt_handler_table
 __tw_external_interrupt_handler_table:
 	.fill 48, 4, 0
@@ -211,11 +224,27 @@ __tw_cpu_interrupt_handler_table:
 	.fill 32, 4, 0
 
 _tw_interrupt_handler_impl:
-	stwu 1, -192(1)
-	stw 0, 4(1)
+	lis 3, __tw_interrupt_stack_top@ha
+	addi 3, 3, __tw_interrupt_stack_top@l
+	stw 1, -204(3)
+	addic 1, 3, -208
+	stw 0, 0(1)
 	stw 2, 8(1)
-	stmw 5, 12(1)
 
+	mfspr 4, 272
+	stw 4, 16(1) // r4
+
+	lis 4, __tw_interrupt_call_scratch@ha
+	addi 4, 4, __tw_interrupt_call_scratch@l
+
+	lwz 3, 0(4)
+	stw 3, 12(1) // r3
+
+	stmw 5, 20(1)
+
+	lwz 17, 4(4) // LR
+	lwz 18, 8(4) // SRR0
+	lwz 19, 12(4) // SRR0
 	mfxer 20
 	mfctr 21
 	mfcr 22
@@ -228,11 +257,11 @@ _tw_interrupt_handler_impl:
 	mfspr 29, 917
 	mfspr 30, 918
 	mfspr 31, 919
-	stmw 20, 120(1)
+	stmw 17, 132(1)
 
 	bl _tw_dispatch_interrupt
 
-	lmw 20, 120(1)
+	lmw 17, 132(1)
 	mtxer 20
 	mtctr 21
 	mtcr 22
@@ -246,13 +275,13 @@ _tw_interrupt_handler_impl:
 	mtspr 918, 30
 	mtspr 919, 31
 
-	lwz 0, 4(1)
+	lwz 0, 0(1)
 	lwz 2, 8(1)
-	lmw 5, 12(1)
-	lwz 1, 0(1)
+	lmw 5, 20(1)
+	lwz 1, 4(1)
 
-	lis 4, _tw_interrupt_call_scratch@ha
-	addi 4, 4, _tw_interrupt_call_scratch@l
+	lis 4, __tw_interrupt_call_scratch@ha
+	addi 4, 4, __tw_interrupt_call_scratch@l
 
 	lwz 3, 4(4)
 	mtlr 3
@@ -265,21 +294,15 @@ _tw_interrupt_handler_impl:
 	mfspr 4, 272 // Restore r4 register from SPRG0, a backup register that we placed the original contents of r4 in
 	rfi
 
-_tw_interrupt_call_scratch:
-	.long 0 // r3
-	.long 0 // LR
-	.long 0 // SRR0
-	.long 0 // SRR1
-
 .globl _tw_interrupt_handler_template
 _tw_interrupt_handler_template:
 	// Save r4 register to SPRG0 (a backup register) ...
 	mtspr 272, 4
 
 	// ...allowing us to use r4 as a pointer to save everything else with
-	lis 4, _tw_interrupt_call_scratch@ha
+	lis 4, __tw_interrupt_call_scratch@ha
 	rlwinm 4, 4, 0, 1, 31 // convert address to physical, since BATs are disabled when a hardware interrupt is issued
-	addi 4, 4, _tw_interrupt_call_scratch@l
+	addi 4, 4, __tw_interrupt_call_scratch@l
 
 	// Save r3, LR, SRR0 and SRR1, since we have to clobber these registers before we can move on
 	stw 3, 0(4)
@@ -304,4 +327,12 @@ _tw_interrupt_handler_template:
 
 .globl _tw_interrupt_handler_template_end
 _tw_interrupt_handler_template_end:
+	.long 0
+
+.globl _tw_interrupt_stack_bottom
+__tw_interrupt_stack_bottom:
+	.fill 1024, 4, 0
+
+.globl _tw_interrupt_stack_top
+__tw_interrupt_stack_top:
 	.long 0

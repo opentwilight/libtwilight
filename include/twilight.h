@@ -86,6 +86,7 @@ extern unsigned TW_EnableInterrupts(void);
 extern unsigned TW_DisableInterrupts(void);
 TwHeapAllocator *TW_GetGlobalAllocator(void);
 TwFileBucket *TW_GetFileTable(void);
+int TW_Printf(const char *fmt, ...);
 
 // structures.c
 // NOT thread-safe -- many of these functions should be locked on the outside in a concurrent context
@@ -114,7 +115,9 @@ int TW_GetHashMapIndex(TwHashMap *map, const char *key, int len);
 
 // strformat.c
 int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...);
+int TW_FormatStringV(TwStream *sink, int maxOutputSize, const char *str, va_list args);
 int TW_WriteInteger(char *outBuf, int maxSize, int minWidth, unsigned bits, unsigned base, unsigned flags, unsigned long long value);
+int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int mode, double value);
 
 // threading.c
 // TODO: General concurrent objects

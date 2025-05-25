@@ -242,10 +242,9 @@ _copy_irq_handler:
 
 	sync
 
+	bl TW_SetDefaultCrashHandlers
 	bl TW_EnableInterrupts
 	bl main
-
-	b TW_Exit
 
 .globl TW_Exit
 TW_Exit:
