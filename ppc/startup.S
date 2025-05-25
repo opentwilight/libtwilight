@@ -245,6 +245,11 @@ _copy_irq_handler:
 	bl TW_EnableInterrupts
 	bl main
 
+	b TW_Exit
+
+.globl TW_Exit
+TW_Exit:
+	// TODO: iterate backwards through atexit() handler list
 	// TODO: do thread cleanup here (joining, etc)
 	// TODO: return to loader or power off
 	b .

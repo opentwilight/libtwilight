@@ -145,6 +145,8 @@ TW_U32ToDouble:
 .globl TW_ModuloDouble // returns the integer division result in r3, and the normalized modulo in f1
 TW_ModuloDouble:
 	stwu 1, -16(1)
+	mflr 0
+	stw 0, 4(1)
 	mr 5, 3
 	fdiv 3, 1, 2
 	fctiwz 4, 3
@@ -152,12 +154,16 @@ TW_ModuloDouble:
 	lwz 3, 8(1)
 	bl TW_U32ToDouble
 	fsub 1, 3, 1 // normalized modulo (0.0-1.0)
+	lwz 0, 4(1)
+	mtlr 0
 	addi 1, 1, 16
 	blr
 
 .globl TW_DivideU64 // unsigned TW_DivideU64(unsigned long long *value, unsigned div)
 TW_DivideU64:
 	stwu 1, -16(1)
+	mflr 0
+	stw 0, 4(1)
 	mr 6, 3
 	mr 5, 4
 	lwz 3, 0(6)
@@ -191,6 +197,8 @@ _tw_divu64_after_upper_rem:
 	stw 7, 0(6)
 	stw 9, 4(6)
 	mr 3, 10
+	lwz 0, 4(1)
+	mtlr 0
 	addi 1, 1, 16
 	blr
 

@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <twilight_common.h>
+#include <twilight.h>
 
 #define TEST_HEAP_SIZE 0x40000
 TwHeapAllocator globalAlloc = {};
