@@ -16,9 +16,16 @@
 	if (term->row >= TERMINAL_ROWS) \
 		term->row = TERMINAL_ROWS - 1; \
 
+static const unsigned _terminalColorPalatte[] = {
+	0x00800080, 0x207120DE, 0x76497624, 0x8D3E8D88,
+	0x0CCD0C76, 0x32BB32E3, 0x8395831A, 0xBF80BF80,
+	0x55805580, 0x797079E8, 0xCE47CE22, 0xF236F289,
+	0x61CA6177, 0x85B985DE, 0xDA90DA18, 0xFF80FF80,
+};
+
 static int _initialized = 0;
 static TwTermFont _default_font;
-static char _padding[32];
+
 static int _changed = 0;
 static unsigned _frame_counter = 0;
 static unsigned _mode_flags = 0;
@@ -164,6 +171,23 @@ void TW_AwaitVideoVBlank(TwVideo *params) {
 		unsigned cur_frame = _frame_counter;
 		while (PEEK_U32(&_frame_counter) == cur_frame);
 	}
+}
+
+// TODO: represent alpha with second Y channel
+unsigned TW_RgbaToYuyv(int r, int g, int b, int a) {
+	int y = 2126 * r + 7152 * g + 722 * b;
+	int u = -999 * r + -3361 * g + 4360 * b;
+	int v = 6150 * r + -5586 * g + -564 * b;
+	y /= 10000;
+	u = (u / 10000) + 128;
+	v = (v / 10000) + 128;
+	if (y > 255) y = 255;
+	if (y < 0) y = 0;
+	if (u > 255) u = 255;
+	if (u < 0) u = 0;
+	if (v > 255) v = 255;
+	if (v < 0) v = 0;
+	return ((unsigned)y << 24) | ((unsigned)u << 16) | ((unsigned)y << 8) | (unsigned)v;
 }
 
 void TW_ClearVideoScreen(TwVideo *params, unsigned color) {
@@ -350,8 +374,48 @@ void _tw_handle_ansi_esc(TwTerminal *term, TwTermFont *font, TwVideo *video, cha
 					term->fore = 0xff80ff80;
 					term->back = 0x00800080;
 				}
-				else if (numeric[0] == 1) {
-					
+				else if (numeric[0] >= 30 && numeric[0] <= 37) {
+					term->fore = _terminalColorPalatte[numeric[0] - 30];
+				}
+				else if (numeric[0] >= 90 && numeric[0] <= 97) {
+					term->fore = _terminalColorPalatte[numeric[0] - 90 + 8];
+				}
+				else if (numeric[0] >= 40 && numeric[0] <= 47) {
+					term->back = _terminalColorPalatte[numeric[0] - 40];
+				}
+				else if (numeric[0] >= 100 && numeric[0] <= 107) {
+					term->back = _terminalColorPalatte[numeric[0] - 100 + 8];
+				}
+				else if (numeric[0] == 38 || numeric[0] == 48) {
+					unsigned *outColor = numeric[0] == 38 ? &term->fore : &term->back;
+					if (numeric[1] == 2) {
+						numeric[5] = 255 - numeric[5];
+						*outColor = TW_RgbaToYuyv(numeric[2], numeric[3], numeric[4], numeric[5]);
+					}
+					else if (numeric[1] == 5) {
+						if (numeric[2] < 16) {
+							*outColor = _terminalColorPalatte[numeric[2]];
+						}
+						else if (numeric[2] < 232) {
+							int rgb = (int)numeric[2] - 16;
+							int r = rgb / 36;
+							int g = (rgb / 6) % 6;
+							int b = rgb % 6;
+							*outColor = TW_RgbaToYuyv(r*51, g*51, b*51, 255);
+						}
+						else {
+							unsigned lum = (numeric[2] - 232) * 11;
+							if (lum >= 85) lum++;
+							if (lum >= 170) lum++;
+							*outColor = 0x00800080 | (lum << 24) | (lum << 8);
+						}
+					}
+				}
+				else if (numeric[0] == 39) {
+					term->fore = 0xff80ff80;
+				}
+				else if (numeric[0] == 49) {
+					term->back = 0x00800080;
 				}
 				return;
 		}
