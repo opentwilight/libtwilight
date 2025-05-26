@@ -259,7 +259,7 @@ void TW_DrawAsciiSpan(TwVideo *video, TwTermFont *font, unsigned back, unsigned 
 		// FIXME: this won't work for glyphs of an odd width
 		for (int j = 0; j < w; j++) {
 			char ch = str[(j + (int)x_off) / halfw];
-			int idx = ch < 0x20 || ch > 0x7e ? 0 : ((int)ch - 0x20);
+			int idx = ch < 0x20 || ch > 0x7f ? 0 : ((int)ch - 0x20);
 			int bit_pos = idx * font->bytesPerGlyph * 8 + ((i + (int)y_off) * halfw + ((j + (int)x_off) % halfw)) * 2;
 			int c = (font->data[bit_pos >> 3] >> (6 - (bit_pos & 7))) & 3;
 			int offset = (i + y) * 320 + j + x;
@@ -446,7 +446,7 @@ int _tw_read_ansi_esc_bytes(TwTerminal *term, TwTermFont *font, TwVideo *video, 
 				term->ansiEscLen = 0;
 			}
 			else {
-				term->ansiEscLen++;
+				term->ansiEscBuf[term->ansiEscLen++] = '[';
 				offset++;
 			}
 		}
@@ -461,17 +461,9 @@ int TW_PrintTerminal(TwTerminal *term, TwTermFont *font, TwVideo *video, const c
 	if (!font)
 		font = &_default_font;
 
-	int text_offsets[TERMINAL_ROWS];
-	for (int i = 0; i < TERMINAL_ROWS; i++)
-		text_offsets[i] = 0;
-
 	int offset = 0;
-	int printCount = 0;
 	while (offset < len) {
 		int isAnsiStart = chars[offset] == 0x1b && term->ansiEscLen == 0;
-		if (!isAnsiStart && printCount >= 1)
-			return offset;
-
 		while ((isAnsiStart || term->ansiEscLen > 0) && offset < len) {
 			isAnsiStart = 0;
 			int processed = _tw_read_ansi_esc_bytes(term, font, video, &chars[offset], len - offset);
@@ -483,81 +475,52 @@ int TW_PrintTerminal(TwTerminal *term, TwTermFont *font, TwVideo *video, const c
 		if (offset >= len)
 			return len;
 
-		int line_origin = term->row;
-		int col_origin = term->column;
-		int line = line_origin;
-		int col = col_origin;
-		int limit = len;
+		int line = term->row;
+		int col = term->column;
+		int home = offset;
+		int home_col = col;
 
-		for (int i = offset; i < len; i++) {
-			if (chars[i] == 0x1b) {
-				limit = i;
+		int i;
+		for (i = offset; i < len; i++) {
+			if (i < len-1 && chars[i] != 0x1b && chars[i] != '\r' && chars[i] != '\n' && !((term->flags & TW_DISABLE_WRAP) == 0 && col >= TERMINAL_COLS - 1)) {
+				col++;
+				continue;
+			}
+			if (i > home) {
+				int r = line % TERMINAL_ROWS;
+				TW_DrawAsciiSpan(video, font, term->back, term->fore, home_col * font->width, r * font->height, &chars[home], i - home);
+				home = i;
+			}
+			if (chars[i] == 0x1b)
 				break;
-			}
-			if (chars[i] == '\r' || chars[i] == '\n' || ((term->flags & TW_DISABLE_WRAP) == 0 && col >= TERMINAL_COLS - 1)) {
-				col = 0;
-				if (chars[i] == '\r' || chars[i] == '\n')
-					col--;
-				if (chars[i] != '\r')
-					line++;
-				if ((term->flags & TW_DISABLE_SCROLL) != 0 && line >= TERMINAL_ROWS) {
-					limit = i;
-					break;
-				}
-				text_offsets[line % TERMINAL_ROWS] = i;
-			}
-			col++;
-		}
 
-		if ((term->flags & TW_DISABLE_SCROLL) == 0) {
-			int scroll = line - TERMINAL_ROWS - 1;
-			if (scroll > 0) {
+			col = 0;
+			home_col = 0;
+			if (home == i && (chars[i] == '\r' || chars[i] == '\n'))
+				home++;
+			if (chars[i] != '\r')
+				line++;
+
+			if (line >= TERMINAL_ROWS) {
+				if (term->flags & TW_DISABLE_SCROLL) {
+					term->row = line;
+					term->column = col;
+					return i;
+				}
+
+				int scroll = line - TERMINAL_ROWS - 1;
 				int delta = 320 * font->height * scroll;
 				for (int i = delta; i < 320 * 480; i++) {
 					video->xfb[i-delta] = video->xfb[i];
 					video->xfb[i] = term->back;
 				}
-
-				line_origin -= scroll;
-				if (line_origin < 0) {
-					// maybe do something smart here
-					line_origin = 0;
-				}
+				line -= scroll;
 			}
 		}
-
-		line = line_origin;
-		int start = text_offsets[line % TERMINAL_ROWS];
-		int home = start;
-		int home_col = col_origin;
-
-		for (int i = start; i < limit; i++) {
-			int is_newline = chars[i] == '\r' || chars[i] == '\n' || ((term->flags & TW_DISABLE_WRAP) == 0 && col >= TERMINAL_COLS - 1);
-			if (i < limit-1 && !is_newline) {
-				col++;
-				continue;
-			}
-			int r = line % TERMINAL_ROWS;
-
-			TW_DrawAsciiSpan(video, font, term->back, term->fore, col * font->width, r * font->height, &chars[home], i - home);
-
-			if (chars[i] == '\n') {
-				col = 0;
-				home = i+1;
-			}
-			else {
-				col = 1;
-				home = i;
-			}
-			home_col = 0;
-			if (chars[i] != '\r')
-				line++;
-		}
+		offset = i;
 
 		term->row = line;
 		term->column = col;
-		printCount++;
-		offset = limit;
 	}
 
 	return offset;

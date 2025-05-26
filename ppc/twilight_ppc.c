@@ -13,7 +13,10 @@ static TwHeapAllocator _g_tw_heap_ex;
 
 static TwFileBucket _g_first_files = {0};
 
-static TwTerminal _g_default_terminal = {0};
+static TwTerminal _g_default_terminal = {
+	.fore = 0xff80ff80,
+	.back = 0x00800080,
+};
 
 static int _tw_stdin_read(TwStream *stream, char *buf, int size) {
 	return 0;
@@ -76,8 +79,10 @@ int TW_Printf(const char *fmt, ...) {
 
 void _tw_print_regs(void) {
 	unsigned *regs = TW_GetStoredRegistersAddress();
-	for (int i = 0; i < 32; i++)
+	for (int i = 0; i < 16; i++)
 		TW_Printf("\x1b[%d;2Hr%d: %08X", 4 + i, i, regs[i]);
+	for (int i = 0; i < 16; i++)
+		TW_Printf("\x1b[%d;18Hr%d: %08X", 4 + i, 16+i, regs[16+i]);
 }
 
 void _tw_default_dsi_handler(void) {

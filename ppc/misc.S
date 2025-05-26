@@ -64,7 +64,7 @@ _tw_fill_words_sync_loop_bulk:
 	addic. 6, 6, -1
 	bne+ _tw_fill_words_sync_loop_bulk
 	rlwinm 6, 7, 3, 0, 28
-	subf. 5, 5, 6
+	sub. 5, 5, 6
 _tw_fill_words_sync_loop_post:
 	blelr
 	stw 4, 0(3)
@@ -76,7 +76,7 @@ _tw_fill_words_sync_loop_post:
 TW_CopyBytes:
 	cmpwi 0, 5, 0
 	blelr
-	subf. 6, 3, 4
+	sub. 6, 3, 4
 	beqlr
 	blt _tw_copy_bytes_forward
 	cmpw 0, 6, 5
@@ -85,8 +85,8 @@ TW_CopyBytes:
 	add 3, 3, 5
 	add 4, 4, 5
 _tw_copy_bytes_backward_loop:
-	lbzu 6, -1(3)
-	stbu 6, -1(4)
+	lbzu 6, -1(4)
+	stbu 6, -1(3)
 	cmpw 0, 3, 7
 	bgt _tw_copy_bytes_backward_loop
 	add 3, 7, 5
@@ -96,8 +96,8 @@ _tw_copy_bytes_forward:
 	addic 3, 3, -1
 	addic 4, 4, -1
 _tw_copy_bytes_forward_loop:
-	lbzu 6, 1(3)
-	stbu 6, 1(4)
+	lbzu 6, 1(4)
+	stbu 6, 1(3)
 	cmpw 0, 3, 7
 	blt _tw_copy_bytes_forward_loop
 	blr
@@ -170,10 +170,10 @@ TW_DivideU64:
 	lwz 4, 4(6)
 	divwu 7, 3, 5
 	mullw 8, 7, 5
-	subf 8, 3, 8
+	sub 8, 3, 8
 	divwu 9, 4, 5
 	mullw 10, 9, 5
-	subf 10, 4, 10
+	sub 10, 4, 10
 	cmpwi 0, 8, 0
 	beq _tw_divu64_after_upper_rem // if there's no remainder in the upper 32 bit division, then skip
 	mr 3, 5
