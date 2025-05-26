@@ -224,10 +224,10 @@ __tw_cpu_interrupt_handler_table:
 	.fill 32, 4, 0
 
 _tw_interrupt_handler_impl:
-	lis 3, __tw_interrupt_stack_top@ha
-	addi 3, 3, __tw_interrupt_stack_top@l
-	stw 1, -204(3)
-	addic 1, 3, -208
+	lis 4, __tw_interrupt_stack_top@ha
+	addi 4, 4, __tw_interrupt_stack_top@l
+	stw 1, -204(4)
+	addic 1, 4, -208
 	stw 0, 0(1)
 	stw 2, 8(1)
 
@@ -237,14 +237,15 @@ _tw_interrupt_handler_impl:
 	lis 4, __tw_interrupt_call_scratch@ha
 	addi 4, 4, __tw_interrupt_call_scratch@l
 
-	lwz 3, 0(4)
-	stw 3, 12(1) // r3
-
 	stmw 5, 20(1)
 
 	lwz 17, 4(4) // LR
 	lwz 18, 8(4) // SRR0
 	lwz 19, 12(4) // SRR0
+
+	lwz 4, 0(4)
+	stw 4, 12(1) // r3
+
 	mfxer 20
 	mfctr 21
 	mfcr 22
@@ -259,7 +260,12 @@ _tw_interrupt_handler_impl:
 	mfspr 31, 919
 	stmw 17, 132(1)
 
+	// For some reason, the stack gets accessed out of bounds by _tw_dispatch_interrupt() when compiled with Clang.
+	// I normally wouldn't care, but since this OoB access is a write that overwrites the saved stack pointer,
+	// it causes big issues. So as a workaround, we create a buffer zone between the saved regs and the stack.
+	addic 1, 1, -32
 	bl _tw_dispatch_interrupt
+	addi 1, 1, 32
 
 	lmw 17, 132(1)
 	mtxer 20
