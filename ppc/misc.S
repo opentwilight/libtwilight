@@ -92,14 +92,24 @@ _tw_copy_bytes_backward_loop:
 	add 3, 7, 5
 	blr
 _tw_copy_bytes_forward:
-	add 7, 3, 5
 	addic 3, 3, -1
 	addic 4, 4, -1
+	add 7, 3, 5
 _tw_copy_bytes_forward_loop:
 	lbzu 6, 1(4)
 	stbu 6, 1(3)
 	cmpw 0, 3, 7
 	blt _tw_copy_bytes_forward_loop
+	blr
+
+.globl TW_FillBytes
+TW_FillBytes:
+	addic 3, 3, -1
+	add 6, 3, 5
+_tw_fill_bytes_loop:
+	stbu 4, 1(3)
+	cmpw 0, 3, 6
+	blt _tw_fill_bytes_loop
 	blr
 
 .globl TW_CountLeadingZeros

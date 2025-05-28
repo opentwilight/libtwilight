@@ -284,8 +284,12 @@ int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int m
 
 int TW_WriteInteger(char *outBuf, int maxSize, int minWidth, unsigned bits, unsigned base, unsigned flags, unsigned long long value) {
 	if (value == 0 || base <= 1) {
-		outBuf[0] = '0';
-		return 1;
+		if (minWidth < 1)
+			minWidth = 1;
+		int i = 0;
+		for ( ; i < minWidth && i < maxSize; i++)
+			outBuf[i] = '0';
+		return i;
 	}
 
 	char buf[64];
