@@ -60,7 +60,6 @@ typedef struct {
 
 typedef struct {
 	long long totalSize;
-	int partitionCount;
 } TwFileProperties;
 
 struct _tw_filesystem;
@@ -77,8 +76,17 @@ struct _tw_file {
 };
 typedef struct _tw_file TwFile;
 
+typedef struct {
+    int next;
+    int firstChild;
+	unsigned magic;
+	unsigned flags;
+	long long offsetBytes;
+	long long sizeBytes;
+} TwPartition;
+
 struct _tw_filesystem {
-	void *parent;
+	TwPartition partition;
 	TwFile access;
 	TwStream (*listDirectory)(struct _tw_filesystem *fs, unsigned flags, const char *path, int pathLen);
 	int (*createDirectory)(struct _tw_filesystem *fs, unsigned flags, const char *path, int pathLen);
@@ -92,19 +100,6 @@ struct _tw_filesystem {
 };
 typedef struct _tw_filesystem TwFilesystem;
 
-typedef struct {
-	unsigned magic;
-	unsigned flags;
-	long long offsetBytes;
-	long long sizeBytes;
-} TwPartition;
-
-struct _tw_file_bucket {
-	TwFile file[TW_FILES_PER_BUCKET];
-	struct _tw_file_bucket *next;
-};
-typedef struct _tw_file_bucket TwFileBucket;
-
 // These must be defined in the architecture implementation, ie. ppc or arm
 extern void TW_Exit(void);
 extern void *TW_CopyBytes(void *dst, const void *src, int len);
@@ -113,7 +108,6 @@ unsigned TW_DivideU64(unsigned long long *value, unsigned base);
 extern unsigned TW_EnableInterrupts(void);
 extern unsigned TW_DisableInterrupts(void);
 TwHeapAllocator *TW_GetGlobalAllocator(void);
-TwFileBucket *TW_GetFileTable(void);
 int TW_Printf(const char *fmt, ...);
 
 // structures.c
@@ -155,13 +149,18 @@ void TW_LockMutex(void **mutex);
 void TW_UnlockMutex(void **mutex);
 
 // file.c
+TwFile *TW_GetFile(int fd);
+void TW_SetFile(int fd, TwFile file);
 TwFile TW_MakeStdin(int (*read)(TwStream*, char*, int));
 TwFile TW_MakeStdout(int (*write)(TwStream*, char*, int));
 
 // filesystem.c
 TwStream TW_EnumeratePartitions(TwFile *device);
-TwFilesystem *TW_MountFilesystem(TwFile *device, TwPartition partition, const char *path, int pathLen);
+TwFilesystem TW_DetermineFilesystem(TwFile *device, TwPartition partition);
+int TW_MountFilesystem(TwFilesystem *fs, const char *path, int pathLen);
+TwFilesystem TW_MountFirstFilesystem(TwFile *device, const char *path, int pathLen);
 int TW_UnmountFilesystem(const char *path, int pathLen);
+TwFilesystem *TW_ResolvePath(const char *path, int pathLen, int *rootCharOffset);
 
 TwStream TW_ListDirectory(unsigned flags, const char *path, int pathLen);
 int TW_CreateDirectory(unsigned flags, const char *path, int pathLen);

@@ -20,9 +20,6 @@ Call with `-DTW_WII` to compile for Wii instead.
 
 ## Immediate TODO
 
-- Optionally blend XFB text with background
-- Friendly DSI and ISI exception crash handler (segfault)
-	- With future plans to implement lazy loading within these handlers
 - Return to loader on return from main()
 - Start work on custom libc implementation that wraps libtwilight
 	- libtwilight **must not** depend on libc, libc must depend on libtwilight

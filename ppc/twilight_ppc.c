@@ -11,8 +11,6 @@ static TwHeapAllocator _g_tw_heap;
 static TwHeapAllocator _g_tw_heap_ex;
 #endif
 
-static TwFileBucket _g_first_files = {0};
-
 static TwTerminal _g_default_terminal = {
 	.fore = 0xff80ff80,
 	.back = 0x00800080,
@@ -35,10 +33,12 @@ static void init_twilight() {
 	_g_tw_heap_ex = TW_MakeHeapAllocator((void*)TW_MEM2_START, (void*)TW_IOS_MEM_START);
 	_g_tw_heap_ex.mutex = (void*)1;
 	_g_tw_heap.next = &_g_tw_heap_ex;
+	TwFilesystem ios_fs = TW_MakeIosFilesystem();
+	TW_MountFilesystem(&ios_fs, "/ios", 4);
 #endif
-	_g_first_files.file[0] = TW_MakeStdin(_tw_stdin_read);
-	_g_first_files.file[1] = TW_MakeStdout(_tw_stdout_write);
-	_g_first_files.file[2] = TW_MakeStdout(_tw_stdout_write);
+	TW_SetFile(0, TW_MakeStdin(_tw_stdin_read));
+	TW_SetFile(1, TW_MakeStdout(_tw_stdout_write));
+	TW_SetFile(2, TW_MakeStdout(_tw_stdout_write));
 	_g_first_files.next = (void*)0;
 }
 
@@ -60,10 +60,6 @@ unsigned TW_GetFramebufferAddress(int *outSize) {
 
 TwHeapAllocator *TW_GetGlobalAllocator(void) {
 	return &_g_tw_heap;
-}
-
-TwFileBucket *TW_GetFileTable(void) {
-	return &_g_first_files;
 }
 
 int TW_Printf(const char *fmt, ...) {

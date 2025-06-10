@@ -1,5 +1,10 @@
 #include <twilight.h>
 
+struct _tw_file_bucket {
+	TwFile file[TW_FILES_PER_BUCKET];
+	struct _tw_file_bucket *next;
+} _g_file_table = {0};
+
 static TwFileProperties _defaultGetProperties(TwFile *file) {
 	TwFileProperties empty = {0};
 	return empty;
@@ -53,11 +58,24 @@ TwFile TW_MakeStdout(int (*write)(TwStream*, char*, int)) {
 	return file;
 }
 
+void TW_SetFile(int fd, TwFile file) {
+	if (fd < 0)
+		return;
+
+	struct _tw_file_bucket *table = &_g_file_table;
+	while (table && fd >= TW_FILES_PER_BUCKET) {
+		fd -= TW_FILES_PER_BUCKET;
+		table = table->next;
+	}
+	if (table)
+		table->file[fd] = file;
+}
+
 TwFile *TW_GetFile(int fd) {
 	if (fd < 0)
 		return (void*)0;
 
-	TwFileBucket *table = TW_GetFileTable();
+	struct _tw_file_bucket *table = &_g_file_table;
 	while (table && fd >= TW_FILES_PER_BUCKET) {
 		fd -= TW_FILES_PER_BUCKET;
 		table = table->next;
