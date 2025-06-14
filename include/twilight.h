@@ -8,7 +8,10 @@
 #define POKE_U16(address, value) *(volatile unsigned short*)(address) = value
 #define POKE_U32(address, value) *(volatile unsigned int*)(address) = value
 
-#define MAX_HEAP_RANGES 4
+#define TW_SEEK_SET 0
+#define TW_SEEK_CUR 1
+#define TW_SEEK_END 2
+
 #define TW_FILES_PER_BUCKET 16
 
 // TODO: Thread local storage for the first N threads that ask for one (eg. N = 4)
@@ -30,11 +33,12 @@ struct tw_heap_allocator {
 };
 typedef struct tw_heap_allocator TwHeapAllocator;
 
-struct tw_stream {
-	void *parent;
-	int (*transfer)(struct tw_stream *stream, char *data, int size);
-};
+// If you want to include a TwStream in a struct, offsetFromParent must be set to offsetof(your_struct, the_twstream_member)
 typedef struct tw_stream TwStream;
+struct tw_stream {
+	int (*transfer)(struct tw_stream *stream, char *data, int size);
+	int offsetFromParent;
+};
 
 typedef struct {
 	TwStream stream;
@@ -62,19 +66,21 @@ typedef struct {
 	long long totalSize;
 } TwFileProperties;
 
-struct _tw_filesystem;
+struct tw_filesystem;
 
-struct _tw_file {
+struct tw_file {
 	unsigned tag;
-	struct _tw_filesystem *fs;
-	TwFileProperties (*getProperties)(struct _tw_file *file);
-	TwStream streamRead;
-	TwStream streamWrite;
-	long long (*seek)(struct _tw_file *file, int type, long long seekAmount);
-	int (*flush)(struct _tw_file *file);
-	int (*close)(struct _tw_file *file);
+	struct tw_filesystem *fs;
+	TwFileProperties (*getProperties)(struct tw_file *file);
+	int (*read)(struct tw_file *file, char *data, int size);
+	int (*write)(struct tw_file *file, char *data, int size);
+	long long (*seek)(struct tw_file *file, long long seekAmount, int whence);
+	int (*ioctl)(struct tw_file *file, ...);
+	int (*ioctlv)(struct tw_file *file, ...);
+	int (*flush)(struct tw_file *file);
+	int (*close)(struct tw_file *file);
 };
-typedef struct _tw_file TwFile;
+typedef struct tw_file TwFile;
 
 typedef struct {
     int next;
@@ -85,20 +91,20 @@ typedef struct {
 	long long sizeBytes;
 } TwPartition;
 
-struct _tw_filesystem {
+struct tw_filesystem {
 	TwPartition partition;
 	TwFile access;
-	TwStream (*listDirectory)(struct _tw_filesystem *fs, unsigned flags, const char *path, int pathLen);
-	int (*createDirectory)(struct _tw_filesystem *fs, unsigned flags, const char *path, int pathLen);
-	int (*deleteDirectory)(struct _tw_filesystem *fs, unsigned flags, const char *path, int pathLen);
-	int (*renameDirectory)(struct _tw_filesystem *fs, unsigned flags, const char *oldPath, int oldPathLen, const char *newPath, int newPathLen);
-	TwFile (*openFile)(struct _tw_filesystem *fs, unsigned flags, const char *path, int pathLen);
-	TwFile (*createFile)(struct _tw_filesystem *fs, unsigned flags, long long initialSize, const char *path, int pathLen);
-	int (*deleteFile)(struct _tw_filesystem *fs, unsigned flags, const char *path, int pathLen);
-	int (*resizeFile)(struct _tw_filesystem *fs, unsigned flags, long long newSize, const char *path, int pathLen);
-	int (*renameFile)(struct _tw_filesystem *fs, unsigned flags, const char *oldPath, int oldPathLen, const char *newPath, int newPathLen);
+	int (*listDirectory)(struct tw_filesystem *fs, unsigned flags, const char *path, int pathLen, TwStream *output);
+	int (*createDirectory)(struct tw_filesystem *fs, unsigned flags, const char *path, int pathLen);
+	int (*deleteDirectory)(struct tw_filesystem *fs, unsigned flags, const char *path, int pathLen);
+	int (*renameDirectory)(struct tw_filesystem *fs, unsigned flags, const char *oldPath, int oldPathLen, const char *newPath, int newPathLen);
+	TwFile (*openFile)(struct tw_filesystem *fs, unsigned flags, const char *path, int pathLen);
+	TwFile (*createFile)(struct tw_filesystem *fs, unsigned flags, long long initialSize, const char *path, int pathLen);
+	int (*deleteFile)(struct tw_filesystem *fs, unsigned flags, const char *path, int pathLen);
+	int (*resizeFile)(struct tw_filesystem *fs, unsigned flags, long long newSize, const char *path, int pathLen);
+	int (*renameFile)(struct tw_filesystem *fs, unsigned flags, const char *oldPath, int oldPathLen, const char *newPath, int newPathLen);
 };
-typedef struct _tw_filesystem TwFilesystem;
+typedef struct tw_filesystem TwFilesystem;
 
 // These must be defined in the architecture implementation, ie. ppc or arm
 extern void TW_Exit(void);
@@ -151,18 +157,19 @@ void TW_UnlockMutex(void **mutex);
 // file.c
 TwFile *TW_GetFile(int fd);
 void TW_SetFile(int fd, TwFile file);
-TwFile TW_MakeStdin(int (*read)(TwStream*, char*, int));
-TwFile TW_MakeStdout(int (*write)(TwStream*, char*, int));
+TwFile TW_MakeStdin(int (*read)(TwFile*, char*, int));
+TwFile TW_MakeStdout(int (*write)(TwFile*, char*, int));
 
 // filesystem.c
-TwStream TW_EnumeratePartitions(TwFile *device);
+int TW_EnumeratePartitions(TwFile *device, TwStream *output);
 TwFilesystem TW_DetermineFilesystem(TwFile *device, TwPartition partition);
 int TW_MountFilesystem(TwFilesystem *fs, const char *path, int pathLen);
 TwFilesystem TW_MountFirstFilesystem(TwFile *device, const char *path, int pathLen);
 int TW_UnmountFilesystem(const char *path, int pathLen);
 TwFilesystem *TW_ResolvePath(const char *path, int pathLen, int *rootCharOffset);
+int TW_WriteMatchingPaths(const char **potentialPaths, int count, const char *path, int pathLen, TwStream *output);
 
-TwStream TW_ListDirectory(unsigned flags, const char *path, int pathLen);
+int TW_ListDirectory(unsigned flags, const char *path, int pathLen, TwStream *output);
 int TW_CreateDirectory(unsigned flags, const char *path, int pathLen);
 int TW_DeleteDirectory(unsigned flags, const char *path, int pathLen);
 int TW_RenameDirectory(unsigned flags, const char *oldPath, int oldPathLen, const char *newPath, int newPathLen);

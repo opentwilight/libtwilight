@@ -165,7 +165,7 @@ int TW_DetermineHeapObjectMaximumSize(TwHeapAllocator *alloc, void *ptr) {
 }
 
 static int _tw_write_buffer_stream(TwStream *stream, char *data, int size) {
-	TwBufferStream *bs = (TwBufferStream*)stream->parent;
+	TwBufferStream *bs = (TwBufferStream*)((unsigned)stream - stream->offsetFromParent);
 	if (bs->offset + size > bs->capacity)
 		return -1;
 
@@ -181,14 +181,14 @@ TwBufferStream TW_MakeBufferStream(char *data, int size) {
 		.capacity = size
 	};
 	bs.stream = (TwStream) {
-		.parent = &bs,
-		.transfer = _tw_write_buffer_stream
+		.transfer = _tw_write_buffer_stream,
+		.offsetFromParent = 0,
 	};
 	return bs;
 }
 
 static int _tw_write_flex_array(TwStream *stream, char *data, int size) {
-	return TW_AppendFlexArray((TwFlexArray*)stream->parent, data, size);
+	return TW_AppendFlexArray((TwFlexArray*)((unsigned)stream - stream->offsetFromParent), data, size);
 }
 
 TwFlexArray TW_MakeFlexArray(TwHeapAllocator *alloc, int initialCapacity) {
@@ -205,8 +205,8 @@ TwFlexArray TW_MakeFlexArray(TwHeapAllocator *alloc, int initialCapacity) {
 		.data = ptr
 	};
 	array.stream = (TwStream) {
-		.parent = &array,
-		.transfer = _tw_write_flex_array
+		.transfer = _tw_write_flex_array,
+		.offsetFromParent = 0,
 	};
 	return array;
 }

@@ -9,10 +9,10 @@ static TwFileProperties _defaultGetProperties(TwFile *file) {
 	TwFileProperties empty = {0};
 	return empty;
 }
-static int _defaultTransfer(TwStream *stream, char *buf, int size) {
+static int _defaultTransfer(TwFile *file, char *buf, int size) {
 	return 0;
 }
-static long long _defaultSeek(TwFile *file, int type, long long seekAmount) {
+static long long _defaultSeek(TwFile *file, long long seekAmount, int whence) {
 	return 0;
 }
 static int _defaultFlush(TwFile *file) {
@@ -22,39 +22,27 @@ static int _defaultClose(TwFile *file) {
 	return 0;
 }
 
-TwFile TW_MakeStdin(int (*read)(TwStream*, char*, int)) {
+TwFile TW_MakeStdin(int (*read)(TwFile*, char*, int)) {
 	TwFile file = (TwFile) {
 		.getProperties = _defaultGetProperties,
 		.seek = _defaultSeek,
 		.flush = _defaultFlush,
 		.close = _defaultClose,
 	};
-	file.streamRead = (TwStream) {
-		.parent = &file,
-		.transfer = read,
-	};
-	file.streamWrite = (TwStream) {
-		.parent = &file,
-		.transfer = _defaultTransfer,
-	};
+	file.read = read;
+	file.write = _defaultTransfer;
 	return file;
 }
 
-TwFile TW_MakeStdout(int (*write)(TwStream*, char*, int)) {
+TwFile TW_MakeStdout(int (*write)(TwFile*, char*, int)) {
 	TwFile file = (TwFile) {
 		.getProperties = _defaultGetProperties,
 		.seek = _defaultSeek,
 		.flush = _defaultFlush, // Maybe add a non-dummy flush method
 		.close = _defaultClose,
 	};
-	file.streamRead = (TwStream) {
-		.parent = &file,
-		.transfer = _defaultTransfer,
-	};
-	file.streamWrite = (TwStream) {
-		.parent = &file,
-		.transfer = write,
-	};
+	file.read = _defaultTransfer;
+	file.write = write;
 	return file;
 }
 

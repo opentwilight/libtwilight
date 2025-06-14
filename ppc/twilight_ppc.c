@@ -16,11 +16,15 @@ static TwTerminal _g_default_terminal = {
 	.back = 0x00800080,
 };
 
-static int _tw_stdin_read(TwStream *stream, char *buf, int size) {
+static int _tw_stdin_read(TwFile *file, char *buf, int size) {
 	return 0;
 }
 
-static int _tw_stdout_write(TwStream *stream, char *buf, int size) {
+static int _tw_stdout_file_write(TwFile *file, char *buf, int size) {
+	return TW_PrintTerminal(&_g_default_terminal, (void*)0, TW_GetDefaultVideo(), buf, size);
+}
+
+static int _tw_stdout_stream_write(TwStream *stream, char *buf, int size) {
 	return TW_PrintTerminal(&_g_default_terminal, (void*)0, TW_GetDefaultVideo(), buf, size);
 }
 
@@ -37,9 +41,8 @@ static void init_twilight() {
 	TW_MountFilesystem(&ios_fs, "/ios", 4);
 #endif
 	TW_SetFile(0, TW_MakeStdin(_tw_stdin_read));
-	TW_SetFile(1, TW_MakeStdout(_tw_stdout_write));
-	TW_SetFile(2, TW_MakeStdout(_tw_stdout_write));
-	_g_first_files.next = (void*)0;
+	TW_SetFile(1, TW_MakeStdout(_tw_stdout_file_write));
+	TW_SetFile(2, TW_MakeStdout(_tw_stdout_file_write));
 }
 
 void TW_InitTwilight(void) {
@@ -66,7 +69,7 @@ int TW_Printf(const char *fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
 
-	TwStream sink = (TwStream) { .transfer = _tw_stdout_write };
+	TwStream sink = (TwStream) { .transfer = _tw_stdout_stream_write };
 	int written = TW_FormatStringV(&sink, 0, fmt, args);
 
 	va_end(args);
