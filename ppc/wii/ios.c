@@ -1,5 +1,7 @@
 #include <twilight_ppc.h>
 
+extern void TW_PumpIos(unsigned *iosBufAligned64Bytes);
+
 static const char *_default_ios_devices[] = {
 	"/dev/aes",
 	"/dev/boot2",
@@ -47,7 +49,9 @@ static const char *_default_ios_devices[] = {
 	"/dev/wl0",
 };
 
-static unsigned _ios_buffer[24];
+static unsigned _ios_buffer[32];
+
+#define ALIGNED_IOS_BUFFER (unsigned*)((((unsigned)&_ios_buffer[0]) + 0x3f) & ~0x3f)
 
 int TW_ListIosFolder(unsigned flags, const char *path, int pathLen, TwStream *output) {
 	if (!path || pathLen <= 0)
@@ -57,19 +61,15 @@ int TW_ListIosFolder(unsigned flags, const char *path, int pathLen, TwStream *ou
 	return TW_WriteMatchingPaths(_default_ios_devices, nDevices, path, pathLen, output);
 }
 
-static void _tw_pump_ios() {
-	
-}
-
 #define RUN_TWO_ARG_IOS_METHOD(cmd_type, arg0, arg1) \
 { \
-	unsigned *iob = (unsigned*)((((unsigned)&_ios_buffer[0]) + 0x1f) & ~0x1f); \
+	unsigned *iob = ALIGNED_IOS_BUFFER; \
 	iob[0] = cmd_type; \
 	iob[1] = 0; \
 	iob[2] = fd; \
 	iob[3] = (unsigned)arg0; \
 	iob[4] = (unsigned)arg1; \
-	_tw_pump_ios(); \
+	TW_PumpIos(iob); \
 	result = (int)iob[1]; \
 }
 
@@ -91,12 +91,39 @@ int TW_SeekIos(int fd, int offset, int whence) {
 	return result;
 }
 
+int TW_IoctlIos(int fd, unsigned method, void *input, int inputSize, void *output, int outputSize) {
+	unsigned *iob = ALIGNED_IOS_BUFFER;
+	iob[0] = TW_IOS_CMD_IOCTL;
+	iob[1] = 0;
+	iob[2] = fd;
+	iob[3] = method;
+	iob[4] = (unsigned)input;
+	iob[5] = (unsigned)inputSize;
+	iob[6] = (unsigned)output;
+	iob[7] = (unsigned)outputSize;
+	TW_PumpIos(iob);
+	return (int)iob[1];
+}
+
+int TW_IoctlvIos(int fd, unsigned method, int nInputs, int nOutputs, void **inputsAndOutputs) {
+	unsigned *iob = ALIGNED_IOS_BUFFER;
+	iob[0] = TW_IOS_CMD_IOCTLV;
+	iob[1] = 0;
+	iob[2] = fd;
+	iob[3] = method;
+	iob[4] = (unsigned)nInputs;
+	iob[5] = (unsigned)nOutputs;
+	iob[6] = (unsigned)inputsAndOutputs;
+	TW_PumpIos(iob);
+	return (int)iob[1];
+}
+
 int TW_CloseIos(int fd) {
-	unsigned *iob = (unsigned*)((((unsigned)&_ios_buffer[0]) + 0x1f) & ~0x1f);
+	unsigned *iob = ALIGNED_IOS_BUFFER;
 	iob[0] = TW_IOS_CMD_CLOSE;
 	iob[1] = 0;
 	iob[2] = fd;
-	_tw_pump_ios();
+	TW_PumpIos(iob);
 	return (int)iob[1];
 }
 
@@ -118,6 +145,14 @@ int _write_ios_file(struct tw_file *file, char *data, int size) {
 long long _seek_ios_file(struct tw_file *file, long long seekAmount, int type) {
 	int delta = (int)seekAmount;
 	return (int)TW_SeekIos((int)file->tag, type, delta);
+}
+
+int _ioctl_ios_file(struct tw_file *file, unsigned method, void *input, int inputSize, void *output, int outputSize) {
+	return TW_IoctlIos((int)file->tag, method, input, inputSize, output, outputSize);
+}
+
+int _ioctlv_ios_file(struct tw_file *file, unsigned method, int nInputs, int nOutputs, void **inputsAndOutputs) {
+	return TW_IoctlvIos((int)file->tag, method, nInputs, nOutputs, inputsAndOutputs);
 }
 
 int _close_ios_file(struct tw_file *file) {

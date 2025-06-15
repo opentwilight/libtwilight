@@ -112,6 +112,50 @@ _tw_fill_bytes_loop:
 	blt _tw_fill_bytes_loop
 	blr
 
+.globl TW_PumpIos // void TW_PumpIos(unsigned *iosBufAligned64Bytes)
+TW_PumpIos:
+	// flush iosBuf, since it was just written to
+	addi 4, 3, 0x20
+	dcbf 0, 3
+	dcbf 0, 4
+	sync
+
+	lis 5, 0xcd00          // ipc register base
+	rlwinm 6, 3, 0, 2, 31  // iosBuf as a physical address
+	li 7, 1                // 1 = clear the send flag
+	stw 6, 0(5)            // use ioBuf address as the IPC value
+	stw 7, 4(5)            // store the new control flags
+	eieio                  // sync external io
+_tw_pump_ios_check_ack:
+	sync
+	lwz 7, 4(5)                 // get the response
+	rlwinm. 7, 7, 0, 30, 30     // check if the acknowledge flag (2) is set
+	beq _tw_pump_ios_check_ack  // check again if not
+
+	li 7, 2     // clear the acknowledge flag
+	stw 7, 4(5)
+	eieio
+_tw_pump_ios_check_reply:
+	sync
+	lwz 7, 4(5)                   // get the response
+	rlwinm. 7, 7, 0, 29, 29       // check if the reply flag (4) is set
+	beq _tw_pump_ios_check_reply  // check again if not
+
+	//lwz 8, 8(5) // the loaded value should now match r6
+
+	li 7, 4      // clear the reply flag
+	stw 7, 4(5)
+	eieio
+	li 7, 8      // clear the relaunch flag (TODO: more research into what this means)
+	stw 7, 4(5)
+	eieio
+
+	// sync iosBuf, since it will (likely) be read once this method returns
+	dcbi 0, 3
+	dcbi 0, 4
+	sync
+	blr
+
 .globl TW_CountLeadingZeros
 TW_CountLeadingZeros:
 	cntlzw 3, 3
@@ -214,13 +258,13 @@ _tw_divu64_after_upper_rem:
 
 .globl TW_GetStoredRegistersAddress
 TW_GetStoredRegistersAddress:
-	lis 3, __tw_interrupt_stack_top@ha
-	addi 3, 3, __tw_interrupt_stack_top@l
+	bl TW_GetInterruptStackPointer
 	addic 3, 3, -208
 	blr
 
 __tw_interrupt_call_scratch:
 	.long 0 // r3
+	.long 0 // r5
 	.long 0 // LR
 	.long 0 // SRR0
 	.long 0 // SRR1
@@ -233,9 +277,8 @@ __tw_external_interrupt_handler_table:
 __tw_cpu_interrupt_handler_table:
 	.fill 32, 4, 0
 
+// void _tw_interrupt_handler_impl(unsigned exceptionType, void *stackPointer)
 _tw_interrupt_handler_impl:
-	lis 4, __tw_interrupt_stack_top@ha
-	addi 4, 4, __tw_interrupt_stack_top@l
 	stw 1, -204(4)
 	addic 1, 4, -208
 	stw 0, 0(1)
@@ -271,7 +314,7 @@ _tw_interrupt_handler_impl:
 	stmw 17, 132(1)
 
 	// For some reason, the stack gets accessed out of bounds by _tw_dispatch_interrupt() when compiled with Clang.
-	// I normally wouldn't care, but since this OoB access is a write that overwrites the saved stack pointer,
+	// Usually this sort of thing is not too concerning, but since this OoB access is a write that overwrites the saved stack pointer,
 	// it causes big issues. So as a workaround, we create a buffer zone between the saved regs and the stack.
 	addic 1, 1, -32
 	bl _tw_dispatch_interrupt
@@ -320,35 +363,35 @@ _tw_interrupt_handler_template:
 	rlwinm 4, 4, 0, 1, 31 // convert address to physical, since BATs are disabled when a hardware interrupt is issued
 	addi 4, 4, __tw_interrupt_call_scratch@l
 
-	// Save r3, LR, SRR0 and SRR1, since we have to clobber these registers before we can move on
+	// Save r3, r5, LR, SRR0 and SRR1, since we have to clobber these registers before we can move on
 	stw 3, 0(4)
+	stw 5, 4(4)
 	mflr 3
-	stw 3, 4(4)
-	mfsrr0 3
 	stw 3, 8(4)
-	mfsrr1 3
+	mfsrr0 3
 	stw 3, 12(4)
+	mfsrr1 3
+	stw 3, 16(4)
+
+	// This does two things:
+	//  - it gets us the stack pointer in r3, while clobbering r4 and r5
+	//  - it stores the current instruction address in LR
+	bl TW_GetInterruptStackPointer
+	mr 4, 3
 
 	// Get the type of exception as an index
-	bl 4 // Branch to the next instruction, while saving the address to the LR
-	mflr 3 // Get the LR, which is dependent on which kind of exception occurred
+	mflr 3 // The current PC, which is now in LR, is dependent on which kind of exception occurred. Save it to r3.
 	rlwinm 3, 3, 24, 24, 31 // shift right by 8 (rotate left by 24) then keep only the 8 least significant bits
 
-	lis 4, _tw_interrupt_handler_impl@ha
-	addi 4, 4, _tw_interrupt_handler_impl@l
-	mtsrr0 4
-	li 4, 0x2032 // floating point, BATs, recover from exceptions
-	mtsrr1 4
+	// Call _tw_interrupt_handler_impl as a software interrupt with the exception type in r3 and the intended stack pointer in r4
+	lis 5, _tw_interrupt_handler_impl@ha
+	addi 5, 5, _tw_interrupt_handler_impl@l
+	mtsrr0 5
+	li 5, 0x2032 // floating point, BATs, recover from exceptions
+	mtsrr1 5
 	rfi
 
 .globl _tw_interrupt_handler_template_end
 _tw_interrupt_handler_template_end:
 	.long 0
 
-.globl _tw_interrupt_stack_bottom
-__tw_interrupt_stack_bottom:
-	.fill 1024, 4, 0
-
-.globl _tw_interrupt_stack_top
-__tw_interrupt_stack_top:
-	.long 0

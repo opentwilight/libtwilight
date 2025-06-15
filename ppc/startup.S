@@ -159,19 +159,19 @@ _start:
 	oris 3, 3, 0x0020 // enable L2 global invalidation
 	mtspr 1017, 3
 
-_wait_for_l2cr_1:
+_wait_for_L2cr_1:
 	mfspr 3, 1017
 	andi. 3, 3, 1
-	bne+ _wait_for_l2cr_1
+	bne+ _wait_for_L2cr_1
 
 	mfspr 3, 1017
 	rlwinm 3, 3, 0, 11, 9 // clear the invalidate bit (0x0020)
 	mtspr 1017, 3
 
-_wait_for_l2cr_2:
+_wait_for_L2cr_2:
 	mfspr 3, 1017
 	andi. 3, 3, 1
-	bne+ _wait_for_l2cr_2
+	bne+ _wait_for_L2cr_2
 
 	oris 3, 3, 0x8000
 	rlwinm 3, 3, 0, 11, 9
@@ -182,21 +182,26 @@ _wait_for_l2cr_2:
 	mtmsr 6
 	sync
 
-_after_l2_setup:
-
 	// setup stack and toc
 	// __bss_start and __toc_region are guaranteed to be aligned to the nearest 32 bytes
 	lis 3, __toc_region@ha
 	addi 2, 3, __toc_region@l
 	mr 13, 2
 
+	// get the end of the toc table
 	lis 5, __toc_size@ha
 	lwz 4, __toc_size@l(5)
-	add 3, 2, 4                 // set the bottom of stack to the end of the toc table
+	add 3, 2, 4
 
+	// then add the size of the stack used for interrupt handlers
+	lis 5, __interrupt_stack_size@ha
+	lwz 4, __interrupt_stack_size@l(5)
+	add 3, 3, 4
+
+	// then add the size of the main stack to set the current stack pointer
 	lis 5, __stack_size@ha
 	lwz 4, __stack_size@l(5)
-	add 1, 3, 4                 // set the top of stack to the bottom plus the stack size
+	add 1, 3, 4
 
 	li 24, 0
 	li 25, 0
@@ -240,6 +245,12 @@ _copy_irq_handler:
 	addic. 27, 27, -1
 	bge+ _instantiate_irq_handlers_outer
 
+#ifdef TW_WII
+	// initialize IOS IPC
+	lis 4, 0xcd00
+	li 3, 6
+	stw 3, 4(4)
+#endif
 	sync
 
 	bl TW_SetDefaultCrashHandlers
@@ -253,7 +264,21 @@ TW_Exit:
 	// TODO: return to loader or power off
 	b .
 
+.globl TW_GetInterruptStackPointer
+TW_GetInterruptStackPointer:
+	lis 3, __toc_region@ha
+	addi 3, 3, __toc_region@l
+	lis 5, __toc_size@ha
+	lwz 4, __toc_size@l(5)
+	add 3, 3, 4
+	lis 5, __interrupt_stack_size@ha
+	lwz 4, __interrupt_stack_size@l(5)
+	add 3, 3, 4
+	blr
+
 __toc_size:
 	.long 0x8000
+__interrupt_stack_size:
+	.long 0x10000
 __stack_size:
 	.long 0x30000

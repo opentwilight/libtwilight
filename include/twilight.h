@@ -12,6 +12,8 @@
 #define TW_SEEK_CUR 1
 #define TW_SEEK_END 2
 
+#define TW_FLAG_WRITE 1
+
 #define TW_FILES_PER_BUCKET 16
 
 // TODO: Thread local storage for the first N threads that ask for one (eg. N = 4)
@@ -75,8 +77,8 @@ struct tw_file {
 	int (*read)(struct tw_file *file, char *data, int size);
 	int (*write)(struct tw_file *file, char *data, int size);
 	long long (*seek)(struct tw_file *file, long long seekAmount, int whence);
-	int (*ioctl)(struct tw_file *file, ...);
-	int (*ioctlv)(struct tw_file *file, ...);
+	int (*ioctl)(struct tw_file *file, unsigned method, void *input, int inputSize, void *output, int outputSize);
+	int (*ioctlv)(struct tw_file *file, unsigned method, int nInputs, int nOutputs, void **inputsAndOutputs);
 	int (*flush)(struct tw_file *file);
 	int (*close)(struct tw_file *file);
 };
