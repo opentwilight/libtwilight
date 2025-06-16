@@ -1,3 +1,25 @@
+// __toc_size = 0x8000
+// __interrupt_stack_size = 0x10000
+// __stack_size = 0x30000
+
+.globl TW_GetTocPointer
+.globl TW_GetInterruptStackStart
+.globl TW_GetMainStackStart
+TW_GetMainStackStart:
+	li 3, 0x480
+	b _tw_get_core_pointer_impl
+TW_GetInterruptStackStart:
+	li 3, 0x180
+	b _tw_get_core_pointer_impl
+TW_GetTocPointer:
+	li 3, 0
+_tw_get_core_pointer_impl:
+	slwi 3, 3, 8
+	lis 4, __toc_region@ha
+	addi 4, 4, __toc_region@l
+	add 3, 4, 3
+	blr
+
 .globl TW_EnableInterrupts
 TW_EnableInterrupts: // void TW_EnableInterrupts()
 	mfmsr 3
@@ -258,7 +280,7 @@ _tw_divu64_after_upper_rem:
 
 .globl TW_GetStoredRegistersAddress
 TW_GetStoredRegistersAddress:
-	bl TW_GetInterruptStackPointer
+	bl TW_GetInterruptStackStart
 	addic 3, 3, -208
 	blr
 
@@ -290,11 +312,12 @@ _tw_interrupt_handler_impl:
 	lis 4, __tw_interrupt_call_scratch@ha
 	addi 4, 4, __tw_interrupt_call_scratch@l
 
+	lwz 5, 4(4)   // r5 got clobbered earlier, so restore it here before saving
 	stmw 5, 20(1)
 
-	lwz 17, 4(4) // LR
-	lwz 18, 8(4) // SRR0
-	lwz 19, 12(4) // SRR0
+	lwz 17, 8(4)  // LR
+	lwz 18, 12(4) // SRR0
+	lwz 19, 16(4) // SRR1
 
 	lwz 4, 0(4)
 	stw 4, 12(1) // r3
@@ -342,11 +365,11 @@ _tw_interrupt_handler_impl:
 	lis 4, __tw_interrupt_call_scratch@ha
 	addi 4, 4, __tw_interrupt_call_scratch@l
 
-	lwz 3, 4(4)
-	mtlr 3
 	lwz 3, 8(4)
-	mtsrr0 3
+	mtlr 3
 	lwz 3, 12(4)
+	mtsrr0 3
+	lwz 3, 16(4)
 	mtsrr1 3
 	lwz 3, 0(4)
 
@@ -374,13 +397,17 @@ _tw_interrupt_handler_template:
 	stw 3, 16(4)
 
 	// This does two things:
-	//  - it gets us the stack pointer in r3, while clobbering r4 and r5
+	//  - it gets us the stack pointer in r3 (while clobbering r4)
 	//  - it stores the current instruction address in LR
-	bl TW_GetInterruptStackPointer
+	lis 3, TW_GetInterruptStackStart@ha
+	rlwinm 3, 3, 0, 1, 31
+	addi 3, 3, TW_GetInterruptStackStart@l
+	mtlr 3
+	blrl
 	mr 4, 3
 
 	// Get the type of exception as an index
-	mflr 3 // The current PC, which is now in LR, is dependent on which kind of exception occurred. Save it to r3.
+	mflr 3 // a nearby instruction address, which is now in LR, is dependent on which kind of exception occurred. Save it to r3.
 	rlwinm 3, 3, 24, 24, 31 // shift right by 8 (rotate left by 24) then keep only the 8 least significant bits
 
 	// Call _tw_interrupt_handler_impl as a software interrupt with the exception type in r3 and the intended stack pointer in r4

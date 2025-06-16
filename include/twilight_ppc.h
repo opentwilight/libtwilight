@@ -206,6 +206,9 @@ void TW_InitExiInterrupts(void);
 // Timer interrupt configurable via DEC register (SPR 22)
 
 // misc.S
+extern void *TW_GetTocPointer(void);
+extern void *TW_GetInterruptStackStart(void);
+extern void *TW_GetMainStackStart(void);
 extern void *TW_FlushMemory(void *ptr, int size);
 extern void *TW_FillWordsAndFlush(void *ptr, unsigned value, int words);
 extern unsigned TW_CountLeadingZeros(unsigned value);

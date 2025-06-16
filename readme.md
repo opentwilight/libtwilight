@@ -14,9 +14,13 @@ Install LLVM and Clang.
 
 ## Compile
 
+### GameCube
+
 `clang -g -target powerpc-eabi -m32 -nostdlib -Iinclude -Wl,-Tppc/sections.ld ppc/*.S ppc/*.c common/*.c examples/hello_world.c -o examples/hello_world.elf`
 
-Call with `-DTW_WII` to compile for Wii instead.
+### Wii
+
+`clang -g -target powerpc-eabi -m32 -nostdlib -DTW_WII -Iinclude -Wl,-Tppc/sections.ld ppc/*.S ppc/*.c ppc/wii/*.c common/*.c examples/hello_world.c -o examples/hello_world.elf`
 
 ## Immediate TODO
 

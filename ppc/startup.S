@@ -182,26 +182,12 @@ _wait_for_L2cr_2:
 	mtmsr 6
 	sync
 
-	// setup stack and toc
-	// __bss_start and __toc_region are guaranteed to be aligned to the nearest 32 bytes
-	lis 3, __toc_region@ha
-	addi 2, 3, __toc_region@l
-	mr 13, 2
+	bl TW_GetTocPointer
+	mr 2, 3
+	mr 13, 3
 
-	// get the end of the toc table
-	lis 5, __toc_size@ha
-	lwz 4, __toc_size@l(5)
-	add 3, 2, 4
-
-	// then add the size of the stack used for interrupt handlers
-	lis 5, __interrupt_stack_size@ha
-	lwz 4, __interrupt_stack_size@l(5)
-	add 3, 3, 4
-
-	// then add the size of the main stack to set the current stack pointer
-	lis 5, __stack_size@ha
-	lwz 4, __stack_size@l(5)
-	add 1, 3, 4
+	bl TW_GetMainStackStart
+	mr 1, 3
 
 	li 24, 0
 	li 25, 0
@@ -263,22 +249,3 @@ TW_Exit:
 	// TODO: do thread cleanup here (joining, etc)
 	// TODO: return to loader or power off
 	b .
-
-.globl TW_GetInterruptStackPointer
-TW_GetInterruptStackPointer:
-	lis 3, __toc_region@ha
-	addi 3, 3, __toc_region@l
-	lis 5, __toc_size@ha
-	lwz 4, __toc_size@l(5)
-	add 3, 3, 4
-	lis 5, __interrupt_stack_size@ha
-	lwz 4, __interrupt_stack_size@l(5)
-	add 3, 3, 4
-	blr
-
-__toc_size:
-	.long 0x8000
-__interrupt_stack_size:
-	.long 0x10000
-__stack_size:
-	.long 0x30000
