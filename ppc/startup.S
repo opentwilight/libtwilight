@@ -247,5 +247,9 @@ _copy_irq_handler:
 TW_Exit:
 	// TODO: iterate backwards through atexit() handler list
 	// TODO: do thread cleanup here (joining, etc)
-	// TODO: return to loader or power off
+#ifdef TW_WII
+	li 3, 1
+	li 4, 2
+	bl TW_LaunchWiiTitle
+#endif
 	b .

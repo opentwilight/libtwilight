@@ -79,7 +79,7 @@ void _tw_dispatch_interrupt(unsigned irqIndex) {
 
 void TW_SetTimerInterrupt(void (*handler)(), unsigned quadCycles) {
 	_tw_decrement_underflow_handler = handler;
-	POKE_SPR("22", quadCycles);
+	PPC_POKE_SPR("22", quadCycles);
 }
 
 void TW_SetCpuInterruptHandler(int interruptType, void (*handler)()) {

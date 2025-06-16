@@ -12,9 +12,16 @@
 #define TW_SEEK_CUR 1
 #define TW_SEEK_END 2
 
-#define TW_FLAG_WRITE 1
+#define TW_MODE_NONE  0
+#define TW_MODE_READ  1
+#define TW_MODE_WRITE 2
+#define TW_MODE_RDWR  3
 
 #define TW_FILES_PER_BUCKET 16
+
+#define TW_FILE_TAG_NONE     0
+#define TW_FILE_TAG_GENERIC  1
+#define TW_FILE_TAG_IOS      2
 
 // TODO: Thread local storage for the first N threads that ask for one (eg. N = 4)
 // TODO: Thread pools
@@ -34,6 +41,11 @@ struct tw_heap_allocator {
 	struct tw_heap_allocator *next;
 };
 typedef struct tw_heap_allocator TwHeapAllocator;
+
+typedef struct {
+	void *data;
+	unsigned size;
+} TwView;
 
 // If you want to include a TwStream in a struct, offsetFromParent must be set to offsetof(your_struct, the_twstream_member)
 typedef struct tw_stream TwStream;
@@ -71,14 +83,16 @@ typedef struct {
 struct tw_filesystem;
 
 struct tw_file {
-	unsigned tag;
 	struct tw_filesystem *fs;
+	unsigned tag;
+	unsigned params[8];
+
 	TwFileProperties (*getProperties)(struct tw_file *file);
 	int (*read)(struct tw_file *file, char *data, int size);
 	int (*write)(struct tw_file *file, char *data, int size);
 	long long (*seek)(struct tw_file *file, long long seekAmount, int whence);
 	int (*ioctl)(struct tw_file *file, unsigned method, void *input, int inputSize, void *output, int outputSize);
-	int (*ioctlv)(struct tw_file *file, unsigned method, int nInputs, int nOutputs, void **inputsAndOutputs);
+	int (*ioctlv)(struct tw_file *file, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs);
 	int (*flush)(struct tw_file *file);
 	int (*close)(struct tw_file *file);
 };
@@ -95,7 +109,7 @@ typedef struct {
 
 struct tw_filesystem {
 	TwPartition partition;
-	TwFile access;
+	TwFile *access;
 	int (*listDirectory)(struct tw_filesystem *fs, unsigned flags, const char *path, int pathLen, TwStream *output);
 	int (*createDirectory)(struct tw_filesystem *fs, unsigned flags, const char *path, int pathLen);
 	int (*deleteDirectory)(struct tw_filesystem *fs, unsigned flags, const char *path, int pathLen);
@@ -136,7 +150,7 @@ void TW_Free(TwHeapAllocator *alloc, void *ptr);
 TwBufferStream TW_MakeBufferStream(char *data, int size);
 
 TwFlexArray TW_MakeFlexArray(TwHeapAllocator *alloc, int initialCapacity);
-int TW_AppendFlexArray(TwFlexArray *array, char *data, int size);
+int TW_AppendFlexArray(TwFlexArray *array, const char *data, int size);
 int TW_ResizeFlexArray(TwFlexArray *array, int newSize);
 
 unsigned TW_GetStringHash(const char *str, int len);
@@ -168,15 +182,15 @@ TwFilesystem TW_DetermineFilesystem(TwFile *device, TwPartition partition);
 int TW_MountFilesystem(TwFilesystem *fs, const char *path, int pathLen);
 TwFilesystem TW_MountFirstFilesystem(TwFile *device, const char *path, int pathLen);
 int TW_UnmountFilesystem(const char *path, int pathLen);
-TwFilesystem *TW_ResolvePath(const char *path, int pathLen, int *rootCharOffset);
+TwFilesystem TW_ResolvePath(const char *path, int pathLen, int *rootCharOffsetOut);
 int TW_WriteMatchingPaths(const char **potentialPaths, int count, const char *path, int pathLen, TwStream *output);
 
-int TW_ListDirectory(unsigned flags, const char *path, int pathLen, TwStream *output);
-int TW_CreateDirectory(unsigned flags, const char *path, int pathLen);
-int TW_DeleteDirectory(unsigned flags, const char *path, int pathLen);
+int TW_ListDirectory(unsigned flags, const char *path, TwStream *output);
+int TW_CreateDirectory(unsigned flags, const char *path);
+int TW_DeleteDirectory(unsigned flags, const char *path);
 int TW_RenameDirectory(unsigned flags, const char *oldPath, int oldPathLen, const char *newPath, int newPathLen);
-TwFile TW_OpenFile(unsigned flags, const char *path, int pathLen);
-TwFile TW_CreateFile(unsigned flags, long long initialSize, const char *path, int pathLen);
-int TW_DeleteFile(unsigned flags, const char *path, int pathLen);
-int TW_ResizeFile(unsigned flags, long long newSize, const char *path, int pathLen);
+TwFile TW_OpenFile(unsigned flags, const char *path);
+TwFile TW_CreateFile(unsigned flags, long long initialSize, const char *path);
+int TW_DeleteFile(unsigned flags, const char *path);
+int TW_ResizeFile(unsigned flags, long long newSize, const char *path);
 int TW_RenameFile(unsigned flags, const char *oldPath, int oldPathLen, const char *newPath, int newPathLen);

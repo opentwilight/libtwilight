@@ -2,7 +2,13 @@
 
 #include "twilight.h"
 
-#define POKE_SPR(nStr, valueVar) __asm("mtspr " nStr ", %0" : : "b"(valueVar))
+#define PPC_SYNC() __asm("sync")
+#define PPC_ISYNC() __asm("isync")
+#define PPC_DCBF(ptr) __asm("dcbf 0, %0" : : "b"(ptr))
+#define PPC_DCBI(ptr) __asm("dcbi 0, %0" : : "b"(ptr) : "memory")
+#define PPC_POKE_SPR(nStr, valueVar) __asm("mtspr " nStr ", %0" : : "b"(valueVar))
+
+#define GET_PHYSICAL_POINTER(x) (void*)((unsigned)(x) & 0x3fffFFFF)
 
 #ifdef TW_WII
 #define TW_INTERRUPT_BIT_STARLET_TIMER (16 + 0)
@@ -120,7 +126,14 @@ typedef struct {
 	unsigned char padDeviceCountAndDevices[1 + MAX_PAD_DEVICES * (PAD_DEVICE_SIZE)];
 } TW_DataSysconf;
 
+// sysconf.c
 int TW_ReadSysconf(TW_DataSysconf *config);
+
+// es.c
+int TW_LaunchWiiTitle(unsigned long long titleId);
+
+// ios.c
+int TW_IoctlvRebootIos(int fd, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs);
 TwFilesystem TW_MakeIosFilesystem(void);
 
 #endif

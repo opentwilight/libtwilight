@@ -169,7 +169,8 @@ void TW_AwaitVideoVBlank(TwVideo *params) {
 	else {
 		// spin
 		unsigned cur_frame = _frame_counter;
-		while (PEEK_U32(&_frame_counter) == cur_frame);
+		while (PEEK_U32(&_frame_counter) == cur_frame)
+			PPC_SYNC();
 	}
 }
 

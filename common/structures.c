@@ -211,7 +211,7 @@ TwFlexArray TW_MakeFlexArray(TwHeapAllocator *alloc, int initialCapacity) {
 	return array;
 }
 
-int TW_AppendFlexArray(TwFlexArray *array, char *data, int size) {
+int TW_AppendFlexArray(TwFlexArray *array, const char *data, int size) {
 	int pos = array->size;
 	if (size <= 0)
 		return pos;

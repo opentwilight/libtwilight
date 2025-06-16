@@ -1,6 +1,5 @@
 #include <twilight_ppc.h>
 
-#define TW_IOS_FD_CACHE_SIZE 1024
 #define ALIGNED_IOS_BUFFER (unsigned*)((((unsigned)&_ios_buffer[0]) + 0x3f) & ~0x3f)
 
 extern int TW_PumpIos(unsigned *iosBufAligned64Bytes, int shouldReboot);
@@ -52,8 +51,6 @@ static const char *_default_ios_devices[] = {
 	"/dev/wl0",
 };
 
-static char _ios_fd_cache[TW_IOS_FD_CACHE_SIZE];
-static int _ios_fd_cache_used = 0;
 static unsigned _ios_buffer[32];
 
 int TW_ListIosFolder(unsigned flags, const char *path, int pathLen, TwStream *output) {
@@ -108,7 +105,7 @@ int TW_IoctlIos(int fd, unsigned method, void *input, int inputSize, void *outpu
 	return (int)iob[1];
 }
 
-int TW_IoctlvIos(int fd, unsigned method, int nInputs, int nOutputs, void **inputsAndOutputs) {
+int TW_IoctlvIos(int fd, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs) {
 	unsigned *iob = ALIGNED_IOS_BUFFER;
 	iob[0] = TW_IOS_CMD_IOCTLV;
 	iob[1] = 0;
@@ -121,7 +118,7 @@ int TW_IoctlvIos(int fd, unsigned method, int nInputs, int nOutputs, void **inpu
 	return (int)iob[1];
 }
 
-int TW_IoctlvRebootIos(int fd, unsigned method, int nInputs, int nOutputs, void **inputsAndOutputs) {
+int TW_IoctlvRebootIos(int fd, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs) {
 	unsigned *iob = ALIGNED_IOS_BUFFER;
 	iob[0] = TW_IOS_CMD_IOCTLV;
 	iob[1] = 0;
@@ -150,28 +147,28 @@ TwFileProperties _get_ios_file_properties(struct tw_file *file) {
 }
 
 int _read_ios_file(struct tw_file *file, char *data, int size) {
-	return TW_ReadIos((int)file->tag, data, size);
+	return TW_ReadIos((int)file->params[0], data, size);
 }
 
 int _write_ios_file(struct tw_file *file, char *data, int size) {
-	return TW_WriteIos((int)file->tag, data, size);
+	return TW_WriteIos((int)file->params[0], data, size);
 }
 
 long long _seek_ios_file(struct tw_file *file, long long seekAmount, int type) {
 	int delta = (int)seekAmount;
-	return (int)TW_SeekIos((int)file->tag, type, delta);
+	return (int)TW_SeekIos((int)file->params[0], type, delta);
 }
 
 int _ioctl_ios_file(struct tw_file *file, unsigned method, void *input, int inputSize, void *output, int outputSize) {
-	return TW_IoctlIos((int)file->tag, method, input, inputSize, output, outputSize);
+	return TW_IoctlIos((int)file->params[0], method, input, inputSize, output, outputSize);
 }
 
-int _ioctlv_ios_file(struct tw_file *file, unsigned method, int nInputs, int nOutputs, void **inputsAndOutputs) {
-	return TW_IoctlvIos((int)file->tag, method, nInputs, nOutputs, inputsAndOutputs);
+int _ioctlv_ios_file(struct tw_file *file, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs) {
+	return TW_IoctlvIos((int)file->params[0], method, nInputs, nOutputs, inputsAndOutputs);
 }
 
 int _close_ios_file(struct tw_file *file) {
-	return TW_CloseIos((int)file->tag);
+	return TW_CloseIos((int)file->params[0]);
 }
 
 TwFile TW_OpenIosDevice(unsigned flags, char *path, int pathLen) {
@@ -179,32 +176,18 @@ TwFile TW_OpenIosDevice(unsigned flags, char *path, int pathLen) {
 	if (!path || pathLen <= 0)
 		return file;
 
-	int pos;
-	for (pos = 0; pos < _ios_fd_cache_used && pos < TW_IOS_FD_CACHE_SIZE; pos++) {
-		int i;
-		for (i = 0; i < pathLen; i++) {
-			if (_ios_fd_cache[pos++] != path[i]) {
-				break;
-			}
-		}
-		if (i == pathLen && _ios_fd_cache[pos] == 0) {
-			
-		}
-	}
-
 	char prev_ch = path[pathLen];
 	path[pathLen] = 0;
-	int mode = (flags & TW_FLAG_WRITE) != 0 ? 2 : 1;
+	int mode = flags;
 	int fd = 0;
 	int result;
 	RUN_TWO_ARG_IOS_METHOD(TW_IOS_CMD_OPEN, path, mode)
 	path[pathLen] = prev_ch;
-
-	TwFile file = {};
-	if (fd < 0)
+	if (fd <= 0)
 		return file;
 
-	file.tag = (unsigned)fd;
+	file.tag = TW_FILE_TAG_IOS;
+	file.params[0] = (unsigned)fd;
 	file.getProperties = _get_ios_file_properties;
 	file.read = _read_ios_file;
 	file.write = _write_ios_file;
