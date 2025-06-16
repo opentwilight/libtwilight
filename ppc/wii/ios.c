@@ -1,6 +1,9 @@
 #include <twilight_ppc.h>
 
-extern void TW_PumpIos(unsigned *iosBufAligned64Bytes);
+#define TW_IOS_FD_CACHE_SIZE 1024
+#define ALIGNED_IOS_BUFFER (unsigned*)((((unsigned)&_ios_buffer[0]) + 0x3f) & ~0x3f)
+
+extern int TW_PumpIos(unsigned *iosBufAligned64Bytes, int shouldReboot);
 
 static const char *_default_ios_devices[] = {
 	"/dev/aes",
@@ -49,9 +52,9 @@ static const char *_default_ios_devices[] = {
 	"/dev/wl0",
 };
 
+static char _ios_fd_cache[TW_IOS_FD_CACHE_SIZE];
+static int _ios_fd_cache_used = 0;
 static unsigned _ios_buffer[32];
-
-#define ALIGNED_IOS_BUFFER (unsigned*)((((unsigned)&_ios_buffer[0]) + 0x3f) & ~0x3f)
 
 int TW_ListIosFolder(unsigned flags, const char *path, int pathLen, TwStream *output) {
 	if (!path || pathLen <= 0)
@@ -69,7 +72,7 @@ int TW_ListIosFolder(unsigned flags, const char *path, int pathLen, TwStream *ou
 	iob[2] = fd; \
 	iob[3] = (unsigned)arg0; \
 	iob[4] = (unsigned)arg1; \
-	TW_PumpIos(iob); \
+	TW_PumpIos(iob, 0); \
 	result = (int)iob[1]; \
 }
 
@@ -101,7 +104,7 @@ int TW_IoctlIos(int fd, unsigned method, void *input, int inputSize, void *outpu
 	iob[5] = (unsigned)inputSize;
 	iob[6] = (unsigned)output;
 	iob[7] = (unsigned)outputSize;
-	TW_PumpIos(iob);
+	TW_PumpIos(iob, 0);
 	return (int)iob[1];
 }
 
@@ -114,8 +117,20 @@ int TW_IoctlvIos(int fd, unsigned method, int nInputs, int nOutputs, void **inpu
 	iob[4] = (unsigned)nInputs;
 	iob[5] = (unsigned)nOutputs;
 	iob[6] = (unsigned)inputsAndOutputs;
-	TW_PumpIos(iob);
+	TW_PumpIos(iob, 0);
 	return (int)iob[1];
+}
+
+int TW_IoctlvRebootIos(int fd, unsigned method, int nInputs, int nOutputs, void **inputsAndOutputs) {
+	unsigned *iob = ALIGNED_IOS_BUFFER;
+	iob[0] = TW_IOS_CMD_IOCTLV;
+	iob[1] = 0;
+	iob[2] = fd;
+	iob[3] = method;
+	iob[4] = (unsigned)nInputs;
+	iob[5] = (unsigned)nOutputs;
+	iob[6] = (unsigned)inputsAndOutputs;
+	return TW_PumpIos(iob, 1);
 }
 
 int TW_CloseIos(int fd) {
@@ -123,7 +138,7 @@ int TW_CloseIos(int fd) {
 	iob[0] = TW_IOS_CMD_CLOSE;
 	iob[1] = 0;
 	iob[2] = fd;
-	TW_PumpIos(iob);
+	TW_PumpIos(iob, 0);
 	return (int)iob[1];
 }
 
@@ -160,6 +175,23 @@ int _close_ios_file(struct tw_file *file) {
 }
 
 TwFile TW_OpenIosDevice(unsigned flags, char *path, int pathLen) {
+	TwFile file = {};
+	if (!path || pathLen <= 0)
+		return file;
+
+	int pos;
+	for (pos = 0; pos < _ios_fd_cache_used && pos < TW_IOS_FD_CACHE_SIZE; pos++) {
+		int i;
+		for (i = 0; i < pathLen; i++) {
+			if (_ios_fd_cache[pos++] != path[i]) {
+				break;
+			}
+		}
+		if (i == pathLen && _ios_fd_cache[pos] == 0) {
+			
+		}
+	}
+
 	char prev_ch = path[pathLen];
 	path[pathLen] = 0;
 	int mode = (flags & TW_FLAG_WRITE) != 0 ? 2 : 1;

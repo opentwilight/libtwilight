@@ -134,48 +134,69 @@ _tw_fill_bytes_loop:
 	blt _tw_fill_bytes_loop
 	blr
 
-.globl TW_PumpIos // void TW_PumpIos(unsigned *iosBufAligned64Bytes)
+.globl TW_PumpIos // bool TW_PumpIos(unsigned *iosBufAligned64Bytes, bool isReboot)
 TW_PumpIos:
 	// flush iosBuf, since it was just written to
-	addi 4, 3, 0x20
+	addi 5, 3, 0x20
 	dcbf 0, 3
-	dcbf 0, 4
+	dcbf 0, 5
 	sync
 
-	lis 5, 0xcd00          // ipc register base
-	rlwinm 6, 3, 0, 2, 31  // iosBuf as a physical address
+	lis 6, 0xcd00          // ipc register base
+	rlwinm 7, 3, 0, 2, 31  // iosBuf as a physical address
+	stw 7, 0(6)            // use ioBuf address as the IPC value
 	li 7, 1                // 1 = clear the send flag
-	stw 6, 0(5)            // use ioBuf address as the IPC value
-	stw 7, 4(5)            // store the new control flags
+	stw 7, 4(6)            // store the new control flags
 	eieio                  // sync external io
 _tw_pump_ios_check_ack:
 	sync
-	lwz 7, 4(5)                 // get the response
+	lwz 7, 4(6)                 // get the response
 	rlwinm. 7, 7, 0, 30, 30     // check if the acknowledge flag (2) is set
 	beq _tw_pump_ios_check_ack  // check again if not
 
 	li 7, 2     // clear the acknowledge flag
-	stw 7, 4(5)
+	stw 7, 4(6)
 	eieio
+
+	cmpwi 0, 4, 0 // if not reboot, skip to checking the reply
+	beq _tw_pump_ios_check_reply
+
+_tw_pump_ios_check_ack_again:
+	sync
+	lwz 7, 4(6)                 // get the response
+	rlwinm. 8, 7, 0, 29, 29     // check if the reply flag (4) is set
+	bne _tw_pump_ios_reboot_failed
+	rlwinm. 8, 7, 0, 30, 30     // check if the acknowledge flag (2) is set
+	beq _tw_pump_ios_check_ack_again  // check again if not
+
+	li 7, 8      // clear the relaunch flag
+	stw 7, 4(6)
+	eieio
+
 _tw_pump_ios_check_reply:
 	sync
-	lwz 7, 4(5)                   // get the response
+	lwz 7, 4(6)                   // get the response
 	rlwinm. 7, 7, 0, 29, 29       // check if the reply flag (4) is set
 	beq _tw_pump_ios_check_reply  // check again if not
 
-	//lwz 8, 8(5) // the loaded value should now match r6
+	//lwz 8, 8(6) // the loaded value should now match ioBuf
 
 	li 7, 4      // clear the reply flag
-	stw 7, 4(5)
+	stw 7, 4(6)
 	eieio
-	li 7, 8      // clear the relaunch flag (TODO: more research into what this means)
-	stw 7, 4(5)
+	li 7, 8      // clear the relaunch flag
+	stw 7, 4(6)
 	eieio
 
 	// sync iosBuf, since it will (likely) be read once this method returns
 	dcbi 0, 3
-	dcbi 0, 4
+	dcbi 0, 5
 	sync
+
+	li 3, 0
+	blr
+_tw_pump_ios_reboot_failed:
+	li 3, 1
 	blr
 
 .globl TW_CountLeadingZeros
