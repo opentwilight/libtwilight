@@ -46,17 +46,23 @@ TwFile TW_MakeStdout(int (*write)(TwFile*, char*, int)) {
 	return file;
 }
 
-void TW_SetFile(int fd, TwFile file) {
+TwFile *TW_SetFile(int fd, TwFile file) {
 	if (fd < 0)
-		return;
+		return (TwFile*)0;
 
 	struct _tw_file_bucket *table = &_g_file_table;
 	while (table && fd >= TW_FILES_PER_BUCKET) {
 		fd -= TW_FILES_PER_BUCKET;
 		table = table->next;
 	}
-	if (table)
-		table->file[fd] = file;
+	if (table) {
+		TwFile *obj = &table->file[fd];
+		*obj = file;
+		if (obj->tag == 0)
+			obj->tag = 1;
+		return obj;
+	}
+	return (TwFile*)0;
 }
 
 TwFile *TW_GetFile(int fd) {
@@ -69,4 +75,28 @@ TwFile *TW_GetFile(int fd) {
 		table = table->next;
 	}
 	return table ? &table->file[fd] : (void*)0;
+}
+
+int TW_AddFile(TwFile file, TwFile **fileOut) {
+	int fd = 3;
+	int fdOffset = 0;
+	struct _tw_file_bucket *table = &_g_file_table;
+	while (table) {
+		for (; fd - fdOffset < TW_FILES_PER_BUCKET; fd++) {
+			TwFile *obj = &table->file[fd - fdOffset];
+			if (obj->tag == 0) {
+				*obj = file;
+				if (obj->tag == 0)
+					obj->tag = 1;
+				if (fileOut)
+					*fileOut = obj;
+				return fd;
+			}
+		}
+		fdOffset += TW_FILES_PER_BUCKET;
+		table = table->next;
+	}
+	if (fileOut)
+		*fileOut = (TwFile*)0;
+	return -1;
 }

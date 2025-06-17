@@ -41,10 +41,10 @@ TwFilesystem TW_DetermineFilesystem(TwFile *device, TwPartition partition) {
 	return fs;
 }
 
-int TW_MountFilesystem(TwFilesystem *fs, const char *path, int pathLen) {
+int TW_MountFilesystem(TwFilesystem *fs, const char *path) {
 	char nullChar = 0;
 	int size;
-	for (size = 0; size < pathLen && path[size] != 0; size++);
+	for (size = 0; path[size] != 0; size++);
 	if (size == 0)
 		return -1;
 
@@ -55,12 +55,12 @@ int TW_MountFilesystem(TwFilesystem *fs, const char *path, int pathLen) {
 	return 0;
 }
 
-TwFilesystem TW_MountFirstFilesystem(TwFile *device, const char *path, int pathLen) {
+TwFilesystem TW_MountFirstFilesystem(TwFile *device, const char *path) {
 	TwFilesystem fs = {};
 	return fs;
 }
 
-int TW_UnmountFilesystem(const char *path, int pathLen) {
+int TW_UnmountFilesystem(const char *path) {
 	return 0;
 }
 
@@ -115,22 +115,22 @@ int TW_RenameDirectory(unsigned flags, const char *oldPath, int oldPathLen, cons
 	return 0;
 }
 
-TwFile TW_OpenFile(unsigned flags, const char *path) {
+TwFile *TW_OpenFile(unsigned flags, const char *path) {
 	int len;
 	for (len = 0; path[len]; len++);
 	int fsRootOff = 0;
 	TwFilesystem fs = TW_ResolveFilesystemPath(path, len, &fsRootOff);
 
+	TwFile *filePtr = (TwFile*)0;
 	if (fs.openFile) {
-		return fs.openFile(&fs, flags, &path[fsRootOff], len - fsRootOff);
+		TwFile file = fs.openFile(&fs, flags, &path[fsRootOff], len - fsRootOff);
+		TW_AddFile(file, &filePtr);
 	}
-	TwFile empty = {};
-	return empty;
+	return filePtr;
 }
 
-TwFile TW_CreateFile(unsigned flags, long long initialSize, const char *path) {
-	TwFile empty = {};
-	return empty;
+TwFile *TW_CreateFile(unsigned flags, long long initialSize, const char *path) {
+	return (TwFile*)0;
 }
 
 int TW_DeleteFile(unsigned flags, const char *path) {

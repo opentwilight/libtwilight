@@ -34,7 +34,7 @@ static void init_twilight() {
 	_g_tw_heap_ex.mutex = (void*)1;
 	_g_tw_heap.next = &_g_tw_heap_ex;
 	TwFilesystem ios_fs = TW_MakeIosFilesystem();
-	TW_MountFilesystem(&ios_fs, "/ios", 4);
+	TW_MountFilesystem(&ios_fs, "/ios");
 #endif
 	TW_SetFile(0, TW_MakeStdin(_tw_stdin_read));
 	TW_SetFile(1, TW_MakeStdout(_tw_stdout_file_write));

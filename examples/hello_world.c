@@ -8,7 +8,7 @@
 typedef unsigned int u32;
 
 int main() {
-	TwVideo videoParams;
+	TwVideo videoParams = {};
 	TW_InitVideo(&videoParams);
 
 	unsigned portMask = 1;

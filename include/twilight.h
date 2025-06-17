@@ -172,7 +172,8 @@ void TW_UnlockMutex(void **mutex);
 
 // file.c
 TwFile *TW_GetFile(int fd);
-void TW_SetFile(int fd, TwFile file);
+TwFile *TW_SetFile(int fd, TwFile file);
+int TW_AddFile(TwFile file, TwFile **fileOut);
 TwFile TW_MakeStdin(int (*read)(TwFile*, char*, int));
 TwFile TW_MakeStdout(int (*write)(TwFile*, char*, int));
 
@@ -180,9 +181,9 @@ TwFile TW_MakeStdout(int (*write)(TwFile*, char*, int));
 void TW_RegisterPartitionParser(unsigned tag, int (*partitionParser)(TwFile *device, TwPartition outerPartition, TwFlexArray *partitionsOut));
 int TW_EnumeratePartitions(TwFile *device, TwPartition outerPartition, TwFlexArray *partitionsOut);
 TwFilesystem TW_DetermineFilesystem(TwFile *device, TwPartition partition);
-int TW_MountFilesystem(TwFilesystem *fs, const char *path, int pathLen);
-TwFilesystem TW_MountFirstFilesystem(TwFile *device, const char *path, int pathLen);
-int TW_UnmountFilesystem(const char *path, int pathLen);
+int TW_MountFilesystem(TwFilesystem *fs, const char *path);
+TwFilesystem TW_MountFirstFilesystem(TwFile *device, const char *path);
+int TW_UnmountFilesystem(const char *path);
 TwFilesystem TW_ResolvePath(const char *path, int pathLen, int *rootCharOffsetOut);
 int TW_WriteMatchingPaths(const char **potentialPaths, int count, const char *path, int pathLen, TwStream *output);
 
@@ -190,8 +191,8 @@ int TW_ListDirectory(unsigned flags, const char *path, TwStream *output);
 int TW_CreateDirectory(unsigned flags, const char *path);
 int TW_DeleteDirectory(unsigned flags, const char *path);
 int TW_RenameDirectory(unsigned flags, const char *oldPath, int oldPathLen, const char *newPath, int newPathLen);
-TwFile TW_OpenFile(unsigned flags, const char *path);
-TwFile TW_CreateFile(unsigned flags, long long initialSize, const char *path);
+TwFile *TW_OpenFile(unsigned flags, const char *path);
+TwFile *TW_CreateFile(unsigned flags, long long initialSize, const char *path);
 int TW_DeleteFile(unsigned flags, const char *path);
 int TW_ResizeFile(unsigned flags, long long newSize, const char *path);
 int TW_RenameFile(unsigned flags, const char *oldPath, int oldPathLen, const char *newPath, int newPathLen);

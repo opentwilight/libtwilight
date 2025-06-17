@@ -241,6 +241,8 @@ _copy_irq_handler:
 
 	bl TW_SetDefaultCrashHandlers
 	bl TW_EnableInterrupts
+	li 3, 0
+	li 4, 0
 	bl main
 
 .globl TW_Exit
@@ -248,6 +250,7 @@ TW_Exit:
 	// TODO: iterate backwards through atexit() handler list
 	// TODO: do thread cleanup here (joining, etc)
 #ifdef TW_WII
+	// TODO: close IOS handles, but not IOS itself
 	li 3, 1
 	li 4, 2
 	bl TW_LaunchWiiTitle

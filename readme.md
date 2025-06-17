@@ -24,9 +24,26 @@ Install LLVM and Clang.
 
 ## TODO
 
+- Storage architecture
+	- Hardware layer
+		- See "Wii hardware"
+		- Select which USB device, ie. dive through hubs
+	- Disk layer
+		- Select partition, or just use the first partition
+	- Filesystem layer
+		- FAT32
+		- API for 3rd party filesystem driver implementations
+	- POSIX file wrapper
+		- open, read, write, flush, close, etc.
+		- file table
+		- mount table (accessible through string path)
 - Custom threading implementation
 	- Use decrement register for scheduling software interrupts
 	- Synchronisation primitives (atomics, semaphores, etc)
+- Build Tools
+	- ELF to DOL
+	- FST generator
+	- GameCube/Wii disc image builder
 - Start work on custom libc implementation that wraps libtwilight
 	- libtwilight **must not** depend on libc, libc must depend on libtwilight
 	- limited POSIX
@@ -64,19 +81,6 @@ Install LLVM and Clang.
 	- SD
 	- NAND
 	- Wifi
-- Storage architecture
-	- Hardware layer
-		- See "Wii hardware"
-		- Select which USB device, ie. dive through hubs
-	- Disk layer
-		- Select partition, or just use the first partition
-	- Filesystem layer
-		- FAT32
-		- API for 3rd party filesystem driver implementations
-	- POSIX file wrapper
-		- open, read, write, flush, close, etc.
-		- file table
-		- mount table (accessible through string path)
 
 Still deciding whether to implement the interface for every IOS module on PPC (eg. ES, STM, etc)...
 
