@@ -38,11 +38,10 @@ TW_DisableInterrupts:
 
 .globl TW_FlushMemory // void *TW_FlushMemory(void *ptr, int size)
 TW_FlushMemory:
-	addi 3, 3, 0x1f
-	addi 4, 4, 0x1f
-	rlwinm 3, 3, 0, 0, 26
-	rlwinm 4, 4, 0, 0, 26
 	add 5, 3, 4
+	addi 5, 5, 0x1f
+	rlwinm 3, 3, 0, 0, 26
+	rlwinm 5, 5, 0, 0, 26
 _tw_flush_memory_loop:
 	dcbf 0, 3
 	dcbt 0, 3
@@ -53,6 +52,36 @@ _tw_flush_memory_loop:
 	addi 3, 3, 0x20
 	cmpw 0, 3, 5
 	bne+ _tw_flush_memory_loop
+	blr
+
+.globl TW_SyncAfterWrite // void *TW_SyncAfterWrite(void *ptr, int size)
+TW_SyncAfterWrite:
+	add 5, 3, 4
+	addi 5, 5, 0x1f
+	rlwinm 3, 3, 0, 0, 26
+	rlwinm 5, 5, 0, 0, 26
+_tw_sync_after_write_loop:
+	dcbf 0, 3
+	addi 3, 3, 0x20
+	cmpw 0, 3, 5
+	bne+ _tw_sync_after_write_loop
+	sync
+	isync
+	blr
+
+.globl TW_SyncBeforeRead // void *TW_SyncBeforeRead(void *ptr, int size)
+TW_SyncBeforeRead:
+	add 5, 3, 4
+	addi 5, 5, 0x1f
+	rlwinm 3, 3, 0, 0, 26
+	rlwinm 5, 5, 0, 0, 26
+_tw_sync_before_read_loop:
+	dcbi 0, 3
+	addi 3, 3, 0x20
+	cmpw 0, 3, 5
+	bne+ _tw_sync_after_write_loop
+	sync
+	isync
 	blr
 
 .globl TW_FillWordsAndFlush

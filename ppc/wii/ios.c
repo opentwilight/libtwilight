@@ -75,13 +75,17 @@ int TW_ListIosFolder(unsigned flags, const char *path, int pathLen, TwStream *ou
 
 int TW_ReadIos(int fd, char *data, int size) {
 	int result;
-	RUN_TWO_ARG_IOS_METHOD(TW_IOS_CMD_READ, data, size)
+	void *physPtr = GET_PHYSICAL_POINTER(data);
+	RUN_TWO_ARG_IOS_METHOD(TW_IOS_CMD_READ, physPtr, size)
+	TW_SyncBeforeRead(data, size);
 	return result;
 }
 
 int TW_WriteIos(int fd, char *data, int size) {
 	int result;
-	RUN_TWO_ARG_IOS_METHOD(TW_IOS_CMD_WRITE, data, size)
+	TW_SyncAfterWrite(data, size);
+	void *physPtr = GET_PHYSICAL_POINTER(data);
+	RUN_TWO_ARG_IOS_METHOD(TW_IOS_CMD_WRITE, physPtr, size)
 	return result;
 }
 
@@ -97,15 +101,23 @@ int TW_IoctlIos(int fd, unsigned method, void *input, int inputSize, void *outpu
 	iob[1] = 0;
 	iob[2] = fd;
 	iob[3] = method;
-	iob[4] = (unsigned)input;
+	iob[4] = (unsigned)GET_PHYSICAL_POINTER(input);
 	iob[5] = (unsigned)inputSize;
-	iob[6] = (unsigned)output;
+	iob[6] = (unsigned)GET_PHYSICAL_POINTER(output);
 	iob[7] = (unsigned)outputSize;
+
+	if (input && inputSize > 0)
+		TW_SyncAfterWrite(input, inputSize);
+
 	TW_PumpIos(iob, 0);
+
+	if (output && outputSize > 0)
+		TW_SyncBeforeRead(output, outputSize);
+
 	return (int)iob[1];
 }
 
-int TW_IoctlvIos(int fd, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs) {
+int TW_IoctlvIos(int fd, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs, int shouldReboot) {
 	unsigned *iob = ALIGNED_IOS_BUFFER;
 	iob[0] = TW_IOS_CMD_IOCTLV;
 	iob[1] = 0;
@@ -114,20 +126,25 @@ int TW_IoctlvIos(int fd, unsigned method, int nInputs, int nOutputs, TwView *inp
 	iob[4] = (unsigned)nInputs;
 	iob[5] = (unsigned)nOutputs;
 	iob[6] = (unsigned)inputsAndOutputs;
-	TW_PumpIos(iob, 0);
+
+	for (int i = 0; i < nInputs + nOutputs; i++) {
+		if (i < nInputs && inputsAndOutputs[i].data && inputsAndOutputs[i].size > 0)
+			TW_SyncAfterWrite(inputsAndOutputs[i].data, inputsAndOutputs[i].size);
+		inputsAndOutputs[i].data = GET_PHYSICAL_POINTER(inputsAndOutputs[i].data);
+	}
+
+	TW_PumpIos(iob, shouldReboot);
+
+	for (int i = nInputs; i < nInputs + nOutputs; i++) {
+		if (inputsAndOutputs[i].data && inputsAndOutputs[i].size > 0)
+			TW_SyncBeforeRead((void*)(0x80000000 | (unsigned)inputsAndOutputs[i].data), inputsAndOutputs[i].size);
+	}
+
 	return (int)iob[1];
 }
 
 int TW_IoctlvRebootIos(int fd, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs) {
-	unsigned *iob = ALIGNED_IOS_BUFFER;
-	iob[0] = TW_IOS_CMD_IOCTLV;
-	iob[1] = 0;
-	iob[2] = fd;
-	iob[3] = method;
-	iob[4] = (unsigned)nInputs;
-	iob[5] = (unsigned)nOutputs;
-	iob[6] = (unsigned)inputsAndOutputs;
-	return TW_PumpIos(iob, 1);
+	return TW_IoctlvIos(fd, method, nInputs, nOutputs, inputsAndOutputs, 1);
 }
 
 int TW_CloseIos(int fd) {
@@ -164,7 +181,7 @@ int _ioctl_ios_file(struct tw_file *file, unsigned method, void *input, int inpu
 }
 
 int _ioctlv_ios_file(struct tw_file *file, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs) {
-	return TW_IoctlvIos((int)file->params[0], method, nInputs, nOutputs, inputsAndOutputs);
+	return TW_IoctlvIos((int)file->params[0], method, nInputs, nOutputs, inputsAndOutputs, 0);
 }
 
 int _close_ios_file(struct tw_file *file) {

@@ -223,6 +223,8 @@ extern void *TW_GetTocPointer(void);
 extern void *TW_GetInterruptStackStart(void);
 extern void *TW_GetMainStackStart(void);
 extern void *TW_FlushMemory(void *ptr, int size);
+extern void *TW_SyncAfterWrite(void *ptr, int size);
+extern void *TW_SyncBeforeRead(void *ptr, int size);
 extern void *TW_FillWordsAndFlush(void *ptr, unsigned value, int words);
 extern unsigned TW_CountLeadingZeros(unsigned value);
 extern int TW_CountBits(unsigned value);
