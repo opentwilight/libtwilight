@@ -39,6 +39,8 @@ static void init_twilight() {
 	TW_SetFile(0, TW_MakeStdin(_tw_stdin_read));
 	TW_SetFile(1, TW_MakeStdout(_tw_stdout_file_write));
 	TW_SetFile(2, TW_MakeStdout(_tw_stdout_file_write));
+	TW_RegisterMbrHandler();
+	TW_RegisterFat32Handler();
 }
 
 void TW_InitTwilight(void) {

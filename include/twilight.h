@@ -195,3 +195,8 @@ TwFile TW_CreateFile(unsigned flags, long long initialSize, const char *path);
 int TW_DeleteFile(unsigned flags, const char *path);
 int TW_ResizeFile(unsigned flags, long long newSize, const char *path);
 int TW_RenameFile(unsigned flags, const char *oldPath, int oldPathLen, const char *newPath, int newPathLen);
+
+int TW_ParseMbrPartitions(TwFile *device, TwPartition outerPartition, TwFlexArray *partitionsOut);
+void TW_RegisterMbrHandler(void);
+int TW_ParseFat32Partition(TwFile *device, TwPartition outerPartition, TwFlexArray *partitionsOut);
+void TW_RegisterFat32Handler(void);
