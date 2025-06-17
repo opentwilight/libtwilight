@@ -1,5 +1,11 @@
 #include "twilight.h"
 
+typedef struct {
+	unsigned tag;
+	int (*parse)(TwFile *device, TwPartition outerPartition, TwFlexArray *partitionsOut);
+} TwPartitionParser;
+
+static TwFlexArray _g_partition_parser_list = {}; // array of TwFilesystem
 static TwFlexArray _g_mount_name_table = {}; // string pool
 static TwFlexArray _g_mount_fs_table = {}; // array of TwFilesystem
 
@@ -24,10 +30,31 @@ static int _try_parse_mbr(TwFile *device, TwPartition *first_four) {
 	return 4;
 }
 
-int TW_EnumeratePartitions(TwFile *device, TwStream *output) {
-    TwPartition first_four[4];
-    int n_partitions = _try_parse_mbr(device, first_four);
-    return 0;
+void TW_RegisterPartitionParser(unsigned tag, int (*partitionParser)(TwFile *device, TwPartition outerPartition, TwFlexArray *partitionsOut)) {
+	TwPartitionParser parser = (TwPartitionParser) {
+		.tag = tag,
+		.parse = partitionParser,
+	};
+	TW_AppendFlexArray(&_g_partition_parser_list, (const char*)&parser, sizeof(TwPartitionParser));
+}
+
+int TW_EnumeratePartitions(TwFile *device, TwPartition outerPartition, TwFlexArray *partitionsOut) {
+	int totalFound = 0;
+    for (int i = 0; i < _g_partition_parser_list.size; i += sizeof(TwPartitionParser)) {
+    	TwPartitionParser *parser = (TwPartitionParser*)&_g_partition_parser_list.data[i];
+    	int partsFoundSoFar = partitionsOut->size / sizeof(TwPartition);
+    	int nFound = parser->parse(device, outerPartition, partitionsOut);
+    	if (nFound <= 0)
+    		continue;
+
+		for (int j = 0; j < nFound; j++) {
+			TwPartition cur = ((TwPartition*)partitionsOut->data)[partsFoundSoFar + j];
+			int n = TW_EnumeratePartitions(device, cur, partitionsOut);
+			if (n > 0)
+				totalFound += n;
+		}
+    }
+    return totalFound;
 }
 
 TwFilesystem TW_DetermineFilesystem(TwFile *device, TwPartition partition) {

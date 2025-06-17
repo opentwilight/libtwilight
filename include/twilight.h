@@ -177,7 +177,8 @@ TwFile TW_MakeStdin(int (*read)(TwFile*, char*, int));
 TwFile TW_MakeStdout(int (*write)(TwFile*, char*, int));
 
 // filesystem.c
-int TW_EnumeratePartitions(TwFile *device, TwStream *output);
+void TW_RegisterPartitionParser(unsigned tag, int (*partitionParser)(TwFile *device, TwPartition outerPartition, TwFlexArray *partitionsOut));
+int TW_EnumeratePartitions(TwFile *device, TwPartition outerPartition, TwFlexArray *partitionsOut);
 TwFilesystem TW_DetermineFilesystem(TwFile *device, TwPartition partition);
 int TW_MountFilesystem(TwFilesystem *fs, const char *path, int pathLen);
 TwFilesystem TW_MountFirstFilesystem(TwFile *device, const char *path, int pathLen);

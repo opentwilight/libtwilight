@@ -22,20 +22,15 @@ Install LLVM and Clang.
 
 `clang -g -target powerpc-eabi -m32 -nostdlib -DTW_WII -Iinclude -Wl,-Tppc/sections.ld ppc/*.S ppc/*.c ppc/wii/*.c common/*.c examples/hello_world.c -o examples/hello_world.elf`
 
-## Immediate TODO
+## TODO
 
-- Return to loader on return from main()
-- Start work on custom libc implementation that wraps libtwilight
-	- libtwilight **must not** depend on libc, libc must depend on libtwilight
-	- limited POSIX
-
-## Secondary TODO
-
-- Finish libc
-- Basic maths functions (similar to list in C standard math.h)
 - Custom threading implementation
 	- Use decrement register for scheduling software interrupts
 	- Synchronisation primitives (atomics, semaphores, etc)
+- Start work on custom libc implementation that wraps libtwilight
+	- libtwilight **must not** depend on libc, libc must depend on libtwilight
+	- limited POSIX
+	- Basic maths functions
 - Serial Interface
 	- Buffer transfers
 	- Different kinds of controllers
@@ -56,7 +51,6 @@ Install LLVM and Clang.
 		- Custom microcode
 		- Manage ARAM
 - Wii hardware
-	- IOS in general
 	- Bluetooth
 		- Wiimote
 		- Nunchuk
