@@ -25,6 +25,9 @@ int main() {
 
 		TwSerialInput input = TW_GetSerialInputs(0);
 
+		if (input.gamecube.buttons & 0x1000)
+			break;
+
 		unsigned yxba = (input.gamecube.buttons & 0x0f00) >> 8;
 		if (yxba != 0)  {
 			if ((yxba & 8) != 0)

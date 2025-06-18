@@ -1,5 +1,49 @@
 #include <twilight_ppc.h>
 
+#define HUD_TOP     32
+#define HUD_BOTTOM  32
+
+int packbitsDecompressRgbToYuyv(unsigned *outData, int outOffset, int outSize, char *strip, int length) {
+	int isRepeat = 0;
+	int left = 0;
+	unsigned rgb = 0;
+	int toWrite = 0;
+
+	for (int i = 0; i < length && outOffset < outSize; i++) {
+		if (left == 0) {
+			int mode = strip[i];
+			isRepeat = mode < 0;
+			left = mode * (1 - (isRepeat * 2)) + 1;
+			continue;
+		}
+
+		unsigned b = ((unsigned)strip[i] & 0xff);
+		if (isRepeat) {
+			int j;
+			for (j = 0; j < left && toWrite < 3; j++) {
+				rgb = (rgb << 8) | b;
+				toWrite++;
+			}
+			left -= j;
+		}
+		else {
+			rgb = (rgb << 8) | b;
+			toWrite++;
+			left--;
+		}
+
+		if (toWrite >= 3) {
+			outData[outOffset++] = TW_RgbaToYuyv((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff, 255);
+		}
+	}
+
+	return outOffset;
+}
+
+int loadImage(TwVideoParams video, TwFile *imageFile) {
+	
+}
+
 #define NULL (void*)0
 
 typedef unsigned int u32;
@@ -19,7 +63,7 @@ int main() {
 	if (!imageFile) {
 		imageFile = TW_CreateFile(TW_MODE_RDWR, 0, "/sd/paint.pb");
 		if (!imageFile) {
-			TW_Printf("\n\nFailed to open or create /sd/paint.bmp on SD card");
+			TW_Printf("\n\nFailed to open or create /sd/paint.pb on SD card");
 			return 2;
 		}
 	}
@@ -40,9 +84,8 @@ int main() {
 	while (1) {
 		TwSerialInput input = TW_GetSerialInputs(0);
 
-		if (input.gamecube.buttons & 0x1000) {
+		if (input.gamecube.buttons & 0x1000)
 			break;
-		}
 
 		int xStick = (int)input.gamecube.analogX - 128;
 		int yStick = (int)input.gamecube.analogY - 128;
