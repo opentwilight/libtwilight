@@ -12,12 +12,12 @@ static TwTerminal _g_default_terminal = {
 	.back = 0x00800080,
 };
 
-static int _tw_stdin_read(TwFile *file, char *buf, int size) {
+static int _tw_stdin_read(TwFile *file, void *buf, int size) {
 	return 0;
 }
 
-static int _tw_stdout_file_write(TwFile *file, char *buf, int size) {
-	return TW_PrintTerminal(&_g_default_terminal, (void*)0, TW_GetDefaultVideo(), buf, size);
+static int _tw_stdout_file_write(TwFile *file, void *buf, int size) {
+	return TW_PrintTerminal(&_g_default_terminal, (void*)0, TW_GetDefaultVideo(), (char*)buf, size);
 }
 
 static int _tw_stdout_stream_write(TwStream *stream, char *buf, int size) {

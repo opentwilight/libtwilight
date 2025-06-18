@@ -88,8 +88,8 @@ struct tw_file {
 	unsigned params[8];
 
 	TwFileProperties (*getProperties)(struct tw_file *file);
-	int (*read)(struct tw_file *file, char *data, int size);
-	int (*write)(struct tw_file *file, char *data, int size);
+	int (*read)(struct tw_file *file, void *data, int size);
+	int (*write)(struct tw_file *file, void *data, int size);
 	long long (*seek)(struct tw_file *file, long long seekAmount, int whence);
 	int (*ioctl)(struct tw_file *file, unsigned method, void *input, int inputSize, void *output, int outputSize);
 	int (*ioctlv)(struct tw_file *file, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs);
@@ -174,8 +174,8 @@ void TW_UnlockMutex(void **mutex);
 TwFile *TW_GetFile(int fd);
 TwFile *TW_SetFile(int fd, TwFile file);
 int TW_AddFile(TwFile file, TwFile **fileOut);
-TwFile TW_MakeStdin(int (*read)(TwFile*, char*, int));
-TwFile TW_MakeStdout(int (*write)(TwFile*, char*, int));
+TwFile TW_MakeStdin(int (*read)(TwFile*, void*, int));
+TwFile TW_MakeStdout(int (*write)(TwFile*, void*, int));
 
 // filesystem.c
 void TW_RegisterPartitionParser(unsigned tag, int (*partitionParser)(TwFile *device, TwPartition outerPartition, TwFlexArray *partitionsOut));

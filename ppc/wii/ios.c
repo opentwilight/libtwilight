@@ -73,7 +73,7 @@ int TW_ListIosFolder(unsigned flags, const char *path, int pathLen, TwStream *ou
 	result = (int)iob[1]; \
 }
 
-int TW_ReadIos(int fd, char *data, int size) {
+int TW_ReadIos(int fd, void *data, int size) {
 	int result;
 	void *physPtr = GET_PHYSICAL_POINTER(data);
 	RUN_TWO_ARG_IOS_METHOD(TW_IOS_CMD_READ, physPtr, size)
@@ -81,7 +81,7 @@ int TW_ReadIos(int fd, char *data, int size) {
 	return result;
 }
 
-int TW_WriteIos(int fd, char *data, int size) {
+int TW_WriteIos(int fd, void *data, int size) {
 	int result;
 	TW_SyncAfterWrite(data, size);
 	void *physPtr = GET_PHYSICAL_POINTER(data);
@@ -163,11 +163,11 @@ TwFileProperties _get_ios_file_properties(struct tw_file *file) {
 	return props;
 }
 
-int _read_ios_file(struct tw_file *file, char *data, int size) {
+int _read_ios_file(struct tw_file *file, void *data, int size) {
 	return TW_ReadIos((int)file->params[0], data, size);
 }
 
-int _write_ios_file(struct tw_file *file, char *data, int size) {
+int _write_ios_file(struct tw_file *file, void *data, int size) {
 	return TW_WriteIos((int)file->params[0], data, size);
 }
 

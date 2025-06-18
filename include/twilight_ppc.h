@@ -192,6 +192,8 @@ void TW_InitVideo(TwVideo *params);
 TwVideo *TW_GetDefaultVideo(void);
 void TW_AwaitVideoVBlank(TwVideo *params);
 void TW_ClearVideoScreen(TwVideo *params, unsigned color);
+unsigned TW_RgbaToYuyv(int r, int g, int b, int a);
+unsigned TW_YuvToRgb(int y, int u, int v);
 void TW_DrawAsciiSpan(TwVideo *video, TwTermFont *font, unsigned back, unsigned fore, float x, float y, const char *str, int count);
 int TW_PrintTerminal(TwTerminal *term, TwTermFont *font, TwVideo *video, const char *chars, int len);
 

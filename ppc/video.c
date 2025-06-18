@@ -191,6 +191,22 @@ unsigned TW_RgbaToYuyv(int r, int g, int b, int a) {
 	return ((unsigned)y << 24) | ((unsigned)u << 16) | ((unsigned)y << 8) | (unsigned)v;
 }
 
+unsigned TW_YuvToRgb(int y, int u, int v) {
+	int r = 10000 * y + 0 * u + 12803 * v;
+	int g = 10000 * y + -2148 * u + -3806 * v;
+	int b = 10000 * y + 21280 * u + 0 * v;
+	r /= 10000;
+	g /= 10000;
+	b /= 10000;
+	if (y > 255) y = 255;
+	if (y < 0) y = 0;
+	if (u > 255) u = 255;
+	if (u < 0) u = 0;
+	if (v > 255) v = 255;
+	if (v < 0) v = 0;
+	return ((unsigned)r << 16) | ((unsigned)g << 8) | (unsigned)b;
+}
+
 void TW_ClearVideoScreen(TwVideo *params, unsigned color) {
 	TW_FillWordsAndFlush(params->xfb, color, 320 * 480);
 }

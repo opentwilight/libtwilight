@@ -9,7 +9,7 @@ static TwFileProperties _defaultGetProperties(TwFile *file) {
 	TwFileProperties empty = {0};
 	return empty;
 }
-static int _defaultTransfer(TwFile *file, char *buf, int size) {
+static int _defaultTransfer(TwFile *file, void *buf, int size) {
 	return 0;
 }
 static long long _defaultSeek(TwFile *file, long long seekAmount, int whence) {
@@ -22,7 +22,7 @@ static int _defaultClose(TwFile *file) {
 	return 0;
 }
 
-TwFile TW_MakeStdin(int (*read)(TwFile*, char*, int)) {
+TwFile TW_MakeStdin(int (*read)(TwFile*, void*, int)) {
 	TwFile file = (TwFile) {
 		.getProperties = _defaultGetProperties,
 		.seek = _defaultSeek,
@@ -34,7 +34,7 @@ TwFile TW_MakeStdin(int (*read)(TwFile*, char*, int)) {
 	return file;
 }
 
-TwFile TW_MakeStdout(int (*write)(TwFile*, char*, int)) {
+TwFile TW_MakeStdout(int (*write)(TwFile*, void*, int)) {
 	TwFile file = (TwFile) {
 		.getProperties = _defaultGetProperties,
 		.seek = _defaultSeek,
