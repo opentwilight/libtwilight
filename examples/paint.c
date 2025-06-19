@@ -57,10 +57,10 @@ int decompressPackbitsRgbToYuyv(unsigned *outData, int outOffset, int outSize, i
 int compressPackbitsYuyvToRgb(TwFlexArray *output, int screenWidth, int vertBorderW, unsigned *input, int inOffset, int inSize) {
 	char last128[128];
 	int posLast128 = 0;
-    int diffLength = 0;
-    int runLength = 0;
-    char run[2];
-    char prev = 0;
+	int diffLength = 0;
+	int runLength = 0;
+	char run[2];
+	char prev = 0;
 
 	for (int i = inOffset; i < inSize; i++) {
 		if (i % screenWidth >= screenWidth - vertBorderW) {
@@ -74,61 +74,61 @@ int compressPackbitsYuyvToRgb(TwFlexArray *output, int screenWidth, int vertBord
 
 		for (int j = 0; j < 3; j++) {
 			char b = (char)((rgb >> (8*(2-j))) & 0xff);
-            if (diffLength >= 0x7e || b == prev) {
-                if (diffLength >= 2) {
-                	char hdr = (char)(diffLength - 2);
-                	TW_AppendFlexArray(output, &hdr, 1);
-                	int pos = (posLast128 - diffLength + 128) & 0x7f;
-                	int wrapLen = (diffLength - 1) - (128 - pos);
-                	if (wrapLen <= 0) {
-                		TW_AppendFlexArray(output, &last128[pos], diffLength - 1);
-                	}
-                	else {
-            			TW_AppendFlexArray(output, &last128[pos], 128 - pos);
-            			TW_AppendFlexArray(output, &last128[0], wrapLen);
-        			}
-                    runLength = 1;
-                }
-                if (b == prev)
-                    diffLength = 0;
-            }
-            if ((runLength & 0x7f) == 0x7f || (b != prev && i > 0)) {
-                if (runLength >= 2) {
-                	run[0] = (char)(1 - (runLength & 0x7f));
-                	run[1] = prev;
-                	TW_AppendFlexArray(output, &run[0], 2);
-                    diffLength = 0;
-                }
-                if (b != prev && i > 0)
-                    runLength = 0;
-                else
-                    runLength++;
-            }
-            last128[posLast128++] = b;
-            posLast128 &= 0x7f;
-            runLength++;
-            diffLength++;
-            prev = b;
+			if (diffLength >= 0x7e || b == prev) {
+				if (diffLength >= 2) {
+					char hdr = (char)(diffLength - 2);
+					TW_AppendFlexArray(output, &hdr, 1);
+					int pos = (posLast128 - diffLength + 128) & 0x7f;
+					int wrapLen = (diffLength - 1) - (128 - pos);
+					if (wrapLen <= 0) {
+						TW_AppendFlexArray(output, &last128[pos], diffLength - 1);
+					}
+					else {
+						TW_AppendFlexArray(output, &last128[pos], 128 - pos);
+						TW_AppendFlexArray(output, &last128[0], wrapLen);
+					}
+					runLength = 1;
+				}
+				if (b == prev)
+					diffLength = 0;
+			}
+			if ((runLength & 0x7f) == 0x7f || (b != prev && i > 0)) {
+				if (runLength >= 2) {
+					run[0] = (char)(1 - (runLength & 0x7f));
+					run[1] = prev;
+					TW_AppendFlexArray(output, &run[0], 2);
+					diffLength = 0;
+				}
+				if (b != prev && i > 0)
+					runLength = 0;
+				else
+					runLength++;
+			}
+			last128[posLast128++] = b;
+			posLast128 &= 0x7f;
+			runLength++;
+			diffLength++;
+			prev = b;
 		}
 	}
-    if (runLength > 1) {
-    	run[0] = (char)(1 - (runLength & 0x7f));
-    	run[1] = prev;
-    	TW_AppendFlexArray(output, &run[0], 2);
-    }
-    else if (diffLength > 0) {
-    	char hdr = (char)(diffLength - 2);
-    	TW_AppendFlexArray(output, &hdr, 1);
-    	int pos = (posLast128 - diffLength + 128) & 0x7f;
-    	int wrapLen = (diffLength - 1) - (128 - pos);
-    	if (wrapLen <= 0) {
-    		TW_AppendFlexArray(output, &last128[pos], diffLength - 1);
-    	}
-    	else {
+	if (runLength > 1) {
+		run[0] = (char)(1 - (runLength & 0x7f));
+		run[1] = prev;
+		TW_AppendFlexArray(output, &run[0], 2);
+	}
+	else if (diffLength > 0) {
+		char hdr = (char)(diffLength - 2);
+		TW_AppendFlexArray(output, &hdr, 1);
+		int pos = (posLast128 - diffLength + 128) & 0x7f;
+		int wrapLen = (diffLength - 1) - (128 - pos);
+		if (wrapLen <= 0) {
+			TW_AppendFlexArray(output, &last128[pos], diffLength - 1);
+		}
+		else {
 			TW_AppendFlexArray(output, &last128[pos], 128 - pos);
 			TW_AppendFlexArray(output, &last128[0], wrapLen);
 		}
-    }
+	}
 
 	return 0;
 }
