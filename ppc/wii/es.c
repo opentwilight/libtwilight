@@ -11,7 +11,7 @@ int TW_LaunchWiiTitle(unsigned long long titleId) {
 	unsigned es_buffer_unaligned[0x118];
 
 	TwFile *es = TW_OpenFile(TW_MODE_NONE, "/ios/dev/es");
-	if (es->tag != TW_FILE_TAG_IOS) {
+	if (es->type != TW_FILE_TYPE_IOS) {
 		es->close(es);
 		return -1;
 	}

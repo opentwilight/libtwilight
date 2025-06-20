@@ -58,8 +58,8 @@ TwFile *TW_SetFile(int fd, TwFile file) {
 	if (table) {
 		TwFile *obj = &table->file[fd];
 		*obj = file;
-		if (obj->tag == 0)
-			obj->tag = 1;
+		if (!obj->type)
+			obj->type = TW_FILE_TYPE_GENERIC;
 		return obj;
 	}
 	return (TwFile*)0;
@@ -84,10 +84,10 @@ int TW_AddFile(TwFile file, TwFile **fileOut) {
 	while (table) {
 		for (; fd - fdOffset < TW_FILES_PER_BUCKET; fd++) {
 			TwFile *obj = &table->file[fd - fdOffset];
-			if (obj->tag == 0) {
+			if (!obj->type) {
 				*obj = file;
-				if (obj->tag == 0)
-					obj->tag = 1;
+				if (!obj->type)
+					obj->type = TW_FILE_TYPE_GENERIC;
 				if (fileOut)
 					*fileOut = obj;
 				return fd;

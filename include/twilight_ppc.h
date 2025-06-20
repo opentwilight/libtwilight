@@ -7,6 +7,7 @@
 #define PPC_DCBF(ptr) __asm("dcbf 0, %0" : : "b"(ptr))
 #define PPC_DCBI(ptr) __asm("dcbi 0, %0" : : "b"(ptr) : "memory")
 #define PPC_POKE_SPR(nStr, valueVar) __asm("mtspr " nStr ", %0" : : "b"(valueVar))
+#define PPC_INV_SQRT(outValue, inValue) __asm("frsqrte %0, %1" : "=f"(outValue) : "f"(inValue) : )
 
 #define GET_PHYSICAL_POINTER(x) (void*)((unsigned)(x) & 0x3fffFFFF)
 
@@ -126,16 +127,6 @@ typedef struct {
 	unsigned char padDeviceCountAndDevices[1 + MAX_PAD_DEVICES * (PAD_DEVICE_SIZE)];
 } TW_DataSysconf;
 
-// sysconf.c
-int TW_ReadSysconf(TW_DataSysconf *config);
-
-// es.c
-int TW_LaunchWiiTitle(unsigned long long titleId);
-
-// ios.c
-int TW_IoctlvRebootIos(int fd, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs);
-TwFilesystem TW_MakeIosFilesystem(void);
-
 #endif
 
 typedef union {
@@ -215,6 +206,23 @@ void TW_InitDspInterrupts(void);
 
 // exi.c
 void TW_InitExiInterrupts(void);
+
+#ifdef TW_WII
+
+// es.c
+int TW_LaunchWiiTitle(unsigned long long titleId);
+
+// ios.c
+int TW_IoctlvRebootIos(int fd, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs);
+TwFilesystem TW_MakeIosFilesystem(void);
+
+// sd.c
+TwFile *TW_OpenSdCard(void);
+
+// sysconf.c
+int TW_ReadSysconf(TW_DataSysconf *config);
+
+#endif
 
 // TODO: PPC-specific spinlocks, parking, atomics, threads
 // threading_ppc.c

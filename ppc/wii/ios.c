@@ -73,7 +73,7 @@ int TW_ListIosFolder(unsigned flags, const char *path, int pathLen, TwStream *ou
 	result = (int)iob[1]; \
 }
 
-int TW_ReadIos(int fd, void *data, int size) {
+int TW_ReadAlignedIos(int fd, void *data, int size) {
 	int result;
 	void *physPtr = GET_PHYSICAL_POINTER(data);
 	RUN_TWO_ARG_IOS_METHOD(TW_IOS_CMD_READ, physPtr, size)
@@ -81,7 +81,7 @@ int TW_ReadIos(int fd, void *data, int size) {
 	return result;
 }
 
-int TW_WriteIos(int fd, void *data, int size) {
+int TW_WriteAlignedIos(int fd, void *data, int size) {
 	int result;
 	TW_SyncAfterWrite(data, size);
 	void *physPtr = GET_PHYSICAL_POINTER(data);
@@ -164,11 +164,11 @@ TwFileProperties _get_ios_file_properties(struct tw_file *file) {
 }
 
 int _read_ios_file(struct tw_file *file, void *data, int size) {
-	return TW_ReadIos((int)file->params[0], data, size);
+	return TW_ReadAlignedIos((int)file->params[0], data, size);
 }
 
 int _write_ios_file(struct tw_file *file, void *data, int size) {
-	return TW_WriteIos((int)file->params[0], data, size);
+	return TW_WriteAlignedIos((int)file->params[0], data, size);
 }
 
 long long _seek_ios_file(struct tw_file *file, long long seekAmount, int type) {
@@ -188,22 +188,27 @@ int _close_ios_file(struct tw_file *file) {
 	return TW_CloseIos((int)file->params[0]);
 }
 
-TwFile TW_OpenIosDevice(unsigned flags, char *path, int pathLen) {
+TwFile TW_OpenIosDevice(unsigned flags, const char *path, int pathLen) {
+	char ios_path_unaligned[256];
 	TwFile file = {};
 	if (!path || pathLen <= 0)
 		return file;
 
-	char prev_ch = path[pathLen];
-	path[pathLen] = 0;
+	char *ios_path = (char*)(((unsigned)&ios_path_unaligned[0] + 0x1f) & ~0x1f);
+	if (pathLen > 223)
+		pathLen = 223;
+	for (int i = 0; i < pathLen; i++)
+		ios_path[i] = path[i];
+	ios_path[pathLen] = 0;
+
 	int mode = flags;
 	int fd = 0;
 	int result;
 	RUN_TWO_ARG_IOS_METHOD(TW_IOS_CMD_OPEN, path, mode)
-	path[pathLen] = prev_ch;
 	if (fd <= 0)
 		return file;
 
-	file.tag = TW_FILE_TAG_IOS;
+	file.type = TW_FILE_TYPE_IOS;
 	file.params[0] = (unsigned)fd;
 	file.getProperties = _get_ios_file_properties;
 	file.read = _read_ios_file;
@@ -220,7 +225,7 @@ static int _list_ios_fs_folder(TwFilesystem *fs, unsigned flags, const char *pat
 }
 
 static TwFile _open_ios_fs_device(TwFilesystem *fs, unsigned flags, const char *path, int pathLen) {
-	return TW_OpenIosDevice(flags, (char*)path, pathLen);
+	return TW_OpenIosDevice(flags, path, pathLen);
 }
 
 TwFilesystem TW_MakeIosFilesystem(void) {

@@ -251,7 +251,9 @@ void drawPath(TwVideo *video, unsigned color, int radius, int prevCursorX, int p
 		return;
 	}
 
-	double lenFloat = 1.0 / PPC_INV_SQRT((double)lenSq);
+	double lenFloat = (double)lenSq;
+	PPC_INV_SQRT(lenFloat, lenFloat);
+	lenFloat = 1.0 / lenFloat;
 	int length = (int)(lenFloat + 0.5);
 	if (length <= 0) {
 		drawCircle(video, color, radius, cursorX, cursorY);

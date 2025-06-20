@@ -19,9 +19,10 @@
 
 #define TW_FILES_PER_BUCKET 16
 
-#define TW_FILE_TAG_NONE     0
-#define TW_FILE_TAG_GENERIC  1
-#define TW_FILE_TAG_IOS      2
+#define TW_FILE_TYPE_NONE     0
+#define TW_FILE_TYPE_GENERIC  1
+#define TW_FILE_TYPE_DISK     2
+#define TW_FILE_TYPE_IOS      3
 
 // TODO: Thread local storage for the first N threads that ask for one (eg. N = 4)
 // TODO: Thread pools
@@ -84,7 +85,8 @@ struct tw_filesystem;
 
 struct tw_file {
 	struct tw_filesystem *fs;
-	unsigned tag;
+	unsigned short flags;
+	unsigned short type;
 	unsigned params[8];
 
 	TwFileProperties (*getProperties)(struct tw_file *file);
@@ -152,6 +154,7 @@ TwBufferStream TW_MakeBufferStream(char *data, int size);
 TwFlexArray TW_MakeFlexArray(TwHeapAllocator *alloc, int initialCapacity);
 int TW_AppendFlexArray(TwFlexArray *array, const char *data, int size);
 int TW_ResizeFlexArray(TwFlexArray *array, int newSize);
+void TW_FreeFlexArray(TwFlexArray *array);
 
 unsigned TW_GetStringHash(const char *str, int len);
 TwHashMap TW_MakeFixedMap(const char **keys, void **keySlots, unsigned *values, int count);

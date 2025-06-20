@@ -250,6 +250,15 @@ int TW_ResizeFlexArray(TwFlexArray *array, int newSize) {
 	return newSize;
 }
 
+void TW_FreeFlexArray(TwFlexArray *array) {
+	if (array->data) {
+		TW_Free(array->alloc, array->data);
+		array->data = (void*)0;
+	}
+	array->capacity = 0;
+	array->size = 0;
+}
+
 // just a dumb hash for now
 unsigned TW_GetStringHash(const char *str, int len) {
 	unsigned hash = 5381;
