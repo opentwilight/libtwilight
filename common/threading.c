@@ -4,6 +4,10 @@ int TW_MultiThreadingEnabled(void) {
 	return 0;
 }
 
+void TW_StartThread(void *userData, void *(*entry)(void*)) {
+	
+}
+
 void TW_LockMutex(TwMutex mutex) {
 	
 }
@@ -12,11 +16,11 @@ void TW_UnlockMutex(TwMutex mutex) {
 	
 }
 
-void TW_BroadcastCondition(TwCondition cond) {
+void TW_AwaitCondition(TwCondition cond, int timeoutMs) {
 	
 }
 
-void TW_AwaitCondition(TwCondition cond, int timeoutMs) {
+void TW_BroadcastCondition(TwCondition cond) {
 	
 }
 
