@@ -187,8 +187,15 @@ int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int m
 // TODO: General concurrent objects
 // TODO: General thread pool
 int TW_MultiThreadingEnabled(void);
+void TW_StartThread(void *userData, void *(*entry)(void*));
 void TW_LockMutex(TwMutex mtx);
 void TW_UnlockMutex(TwMutex mtx);
+void TW_AwaitCondition(TwCondition cond, int timeoutMs);
+void TW_BroadcastCondition(TwCondition cond);
+void TW_AwaitFuture(TwFuture *future);
+void TW_CompleteFuture(TwFuture *future, void *value);
+void TW_FailFuture(TwFuture *future, int res);
+void TW_ReachFuture(TwFuture *future, void *value, int res);
 
 // file.c
 TwFile *TW_GetFile(int fd);
