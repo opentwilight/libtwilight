@@ -27,6 +27,12 @@
 // TODO: Thread local storage for the first N threads that ask for one (eg. N = 4)
 // TODO: Thread pools
 
+struct tw_mutex;
+struct tw_condition_variable;
+
+typedef struct tw_mutex* TwMutex;
+typedef struct tw_condition_variable* TwCondition;
+
 struct tw_heap_block {
 	struct tw_heap_block *prev; // if the LSB is 1, then this block has been freed
 	struct tw_heap_block *next;
@@ -34,7 +40,7 @@ struct tw_heap_block {
 typedef struct tw_heap_block TwHeapBlockHeader;
 
 struct tw_heap_allocator {
-	void *mutex;
+	TwMutex mutex;
 	int capacity;
 	void *startAddr;
 	TwHeapBlockHeader *first;
@@ -78,10 +84,21 @@ typedef struct {
 } TwHashMap;
 
 typedef struct {
+	TwCondition cond;
+	TwMutex mtx;
+	void *value;
+} TwFuture;
+
+typedef struct {
 	long long totalSize;
 } TwFileProperties;
 
 struct tw_filesystem;
+
+struct tw_file;
+
+typedef void (*TwIoCompletion)(struct tw_file *file, void *userData, int method, int result);
+typedef void (*TwIoCompletion64)(struct tw_file *file, void *userData, int method, long long result);
 
 struct tw_file {
 	struct tw_filesystem *fs;
@@ -90,13 +107,13 @@ struct tw_file {
 	unsigned params[8];
 
 	TwFileProperties (*getProperties)(struct tw_file *file);
-	int (*read)(struct tw_file *file, void *data, int size);
-	int (*write)(struct tw_file *file, void *data, int size);
-	long long (*seek)(struct tw_file *file, long long seekAmount, int whence);
-	int (*ioctl)(struct tw_file *file, unsigned method, void *input, int inputSize, void *output, int outputSize);
-	int (*ioctlv)(struct tw_file *file, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs);
-	int (*flush)(struct tw_file *file);
-	int (*close)(struct tw_file *file);
+	void (*read)(struct tw_file *file, void *userData, void *data, int size, TwIoCompletion completionHandler);
+	void (*write)(struct tw_file *file, void *userData, void *data, int size, TwIoCompletion completionHandler);
+	void (*seek)(struct tw_file *file, void *userData, long long seekAmount, int whence, TwIoCompletion64 completionHandler);
+	void (*ioctl)(struct tw_file *file, void *userData, unsigned method, void *input, int inputSize, void *output, int outputSize, TwIoCompletion completionHandler);
+	void (*ioctlv)(struct tw_file *file, void *userData, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs, TwIoCompletion completionHandler);
+	void (*flush)(struct tw_file *file, void *userData, TwIoCompletion completionHandler);
+	void (*close)(struct tw_file *file, void *userData, TwIoCompletion completionHandler);
 };
 typedef struct tw_file TwFile;
 
@@ -170,8 +187,8 @@ int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int m
 // TODO: General concurrent objects
 // TODO: General thread pool
 int TW_MultiThreadingEnabled(void);
-void TW_LockMutex(void **mutex);
-void TW_UnlockMutex(void **mutex);
+void TW_LockMutex(TwMutex mtx);
+void TW_UnlockMutex(TwMutex mtx);
 
 // file.c
 TwFile *TW_GetFile(int fd);

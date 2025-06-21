@@ -5,12 +5,12 @@
 		alloc = TW_GetGlobalAllocator(); \
 	} \
 	if (alloc->mutex) { \
-		TW_LockMutex(&alloc->mutex); \
+		TW_LockMutex(alloc->mutex); \
 	}
 
 #define END_ALLOCATOR_METHOD() \
 	if (alloc->mutex) { \
-		TW_UnlockMutex(&alloc->mutex); \
+		TW_UnlockMutex(alloc->mutex); \
 	}
 
 TwHeapAllocator TW_MakeHeapAllocator(void *startAddress, void *endAddress) {
