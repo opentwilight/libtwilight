@@ -143,6 +143,12 @@ typedef struct tw_filesystem TwFilesystem;
 
 // These must be defined in the architecture implementation, ie. ppc or arm
 extern void TW_Exit(void);
+extern int TW_CompareAndSwapAtomic(unsigned *address, unsigned expected, unsigned newValue);
+extern unsigned TW_GetAndSetAtomic(unsigned *address, unsigned newValue);
+extern unsigned TW_AddAtomic(unsigned *address, int delta);
+extern unsigned TW_OrAtomic(unsigned *address, unsigned value);
+extern unsigned TW_XorAtomic(unsigned *address, unsigned value);
+extern unsigned TW_AndAtomic(unsigned *address, unsigned value);
 extern void *TW_CopyBytes(void *dst, const void *src, int len);
 extern void *TW_FillBytes(void *dst, unsigned char byte, int len);
 unsigned TW_DivideU64(unsigned long long *value, unsigned base);

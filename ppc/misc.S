@@ -36,6 +36,70 @@ TW_DisableInterrupts:
 	isync
 	blr
 
+.globl TW_CompareAndSwapAtomic // bool TW_CompareAndSwapAtomic(unsigned *address, unsigned expected, unsigned newValue)
+TW_CompareAndSwapAtomic:
+	// reserve the 32 byte cache block, so that we know if we were interrupted before we could complete the swap
+	lwarx 6, 0, 3
+	// select newValue if r6 == expected, else keep the old value
+	sub 7, 6, 4             // get the difference between the loaded value and the expected value
+	neg 8, 7                // negate and OR ensures the top bit of is set if and only if there is a difference
+	or 7, 7, 8
+	rlwinm 7, 7, 1, 31, 31  // shift right by 31, so we have it in the least significant bit
+	neg 8, 7                // set r8 to all ones if there is a difference, all zeros if not
+	addic 7, 7, -1          // set r7 to all ones if there is NO difference, all zeros if so
+	addi 9, 8, 1            // keep whether it was equal or not in r9 by adding 1 to the not-equal mask
+	and 7, 7, 5             // valueToSet = (newValue & matchedExpected) | (oldValue & didNotMatchExpected)
+	and 8, 8, 6
+	or 6, 8, 7
+	stwcx. 6, 0, 3          // attempt to store if the earlier reservation still exists
+	bne TW_CompareAndSwapAtomic
+	mr 3, 9                 // we kept whether the old value matched the expected in r9, so copy it to the return register
+	blr
+
+.globl TW_GetAndSetAtomic // unsigned TW_GetAndSetAtomic(unsigned *address, unsigned newValue)
+TW_GetAndSetAtomic:
+	lwarx 6, 0, 3
+	stwcx. 4, 0, 3
+	bne TW_GetAndSetAtomic
+	mr 3, 6
+	blr
+
+.globl TW_AddAtomic // unsigned TW_AddAtomic(unsigned *address, int delta)
+TW_AddAtomic:
+	lwarx 6, 0, 3
+	add 6, 6, 4
+	stwcx. 6, 0, 3
+	bne TW_AddAtomic
+	mr 3, 6
+	blr
+
+.globl TW_OrAtomic // unsigned TW_OrAtomic(unsigned *address, unsigned value)
+TW_OrAtomic:
+	lwarx 6, 0, 3
+	or 6, 6, 4
+	stwcx. 6, 0, 3
+	bne TW_OrAtomic
+	mr 3, 6
+	blr
+
+.globl TW_XorAtomic // unsigned TW_XorAtomic(unsigned *address, unsigned value)
+TW_XorAtomic:
+	lwarx 6, 0, 3
+	xor 6, 6, 4
+	stwcx. 6, 0, 3
+	bne TW_XorAtomic
+	mr 3, 6
+	blr
+
+.globl TW_AndAtomic // unsigned TW_AndAtomic(unsigned *address, unsigned value)
+TW_AndAtomic:
+	lwarx 6, 0, 3
+	and 6, 6, 4
+	stwcx. 6, 0, 3
+	bne TW_AndAtomic
+	mr 3, 6
+	blr
+
 .globl TW_FlushMemory // void *TW_FlushMemory(void *ptr, int size)
 TW_FlushMemory:
 	add 5, 3, 4
@@ -436,7 +500,13 @@ _tw_interrupt_handler_template:
 	rlwinm 4, 4, 0, 1, 31 // convert address to physical, since BATs are disabled when a hardware interrupt is issued
 	addi 4, 4, __tw_interrupt_call_scratch@l
 
-	// Save r3, r5, LR, SRR0 and SRR1, since we have to clobber these registers before we can move on
+	// Save r3, r5, LR, SRR0 and SRR1, since we have to clobber these registers before we can move on.
+	// We use a stwcx. instruction to attempt to store r3 to [r4] first,
+	//  since this instruction is the only way to clear the memory reservation flag.
+	// If that flag was set, then the store operation succeeds, otherwise, it never goes through.
+	// We want to clear that flag regardless as that is how we communicate interruption to an atomic operation.
+	// So, regardless of whether stwcx. "worked" or not, we will store the value again anyway.
+	stwcx. 3, 0, 4
 	stw 3, 0(4)
 	stw 5, 4(4)
 	mflr 3

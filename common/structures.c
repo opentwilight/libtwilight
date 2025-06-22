@@ -315,3 +315,19 @@ int TW_GetHashMapIndex(TwHashMap *map, const char *key, int len) {
 
 	return -1;
 }
+
+void TW_AwaitFuture(TwFuture *future, int timeoutMs) {
+	
+}
+
+void TW_CompleteFuture(TwFuture *future, void *value) {
+	
+}
+
+void TW_FailFuture(TwFuture *future, int res) {
+	
+}
+
+void TW_ReachFuture(TwFuture *future, void *value, int res) {
+	
+}
