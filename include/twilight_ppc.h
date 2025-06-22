@@ -11,6 +11,8 @@
 
 #define GET_PHYSICAL_POINTER(x) (void*)((unsigned)(x) & 0x3fffFFFF)
 
+#define TW_PPC_MAX_THREADS 128
+
 #ifdef TW_WII
 #define TW_INTERRUPT_BIT_STARLET_TIMER (16 + 0)
 #define TW_INTERRUPT_BIT_NAND          (16 + 1)
@@ -232,6 +234,8 @@ int TW_ReadSysconf(TW_DataSysconf *config);
 extern void *TW_GetTocPointer(void);
 extern void *TW_GetInterruptStackStart(void);
 extern void *TW_GetMainStackStart(void);
+extern unsigned TW_EnableInterrupts(void);
+extern unsigned TW_DisableInterrupts(void);
 extern void *TW_FlushMemory(void *ptr, int size);
 extern void *TW_SyncAfterWrite(void *ptr, int size);
 extern void *TW_SyncBeforeRead(void *ptr, int size);

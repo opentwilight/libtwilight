@@ -146,8 +146,6 @@ extern void TW_Exit(void);
 extern void *TW_CopyBytes(void *dst, const void *src, int len);
 extern void *TW_FillBytes(void *dst, unsigned char byte, int len);
 unsigned TW_DivideU64(unsigned long long *value, unsigned base);
-extern unsigned TW_EnableInterrupts(void);
-extern unsigned TW_DisableInterrupts(void);
 TwHeapAllocator *TW_GetGlobalAllocator(void);
 int TW_Printf(const char *fmt, ...);
 
@@ -192,7 +190,7 @@ void TW_LockMutex(TwMutex mtx);
 void TW_UnlockMutex(TwMutex mtx);
 void TW_AwaitCondition(TwCondition cond, int timeoutMs);
 void TW_BroadcastCondition(TwCondition cond);
-void TW_AwaitFuture(TwFuture *future);
+void TW_AwaitFuture(TwFuture *future, int timeoutMs);
 void TW_CompleteFuture(TwFuture *future, void *value);
 void TW_FailFuture(TwFuture *future, int res);
 void TW_ReachFuture(TwFuture *future, void *value, int res);
