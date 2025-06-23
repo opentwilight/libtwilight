@@ -316,6 +316,59 @@ int TW_GetHashMapIndex(TwHashMap *map, const char *key, int len) {
 	return -1;
 }
 
+// buffer must be 32*32 + misalignment bytes long
+// if you don't know the alignment, assume misalignment = 32
+// so, 1056 bytes.
+TwSlabBucket256 TW_CreateSlabBucket256(char *buffer) {
+	char *ptr = (char*)(((unsigned)buffer) + 0x1f) & ~0x1f);
+	TwSlabBucket256 bucket = {
+		.usedBitField = 0,
+		.buffer = buffer,
+		.first = ptr,
+		.next = (void*)0,
+	};
+	return bucket;
+}
+
+void *TW_AddSb256Item(TwSlabBucket256 *bucket) {
+	int flag = 32;
+	while (1) {
+		unsigned unused = ~bucket->usedBitField;
+		flag = TW_CountLeadingZeroes(unused);
+		if (flag < 32)
+			break;
+
+		if (!bucket->next) {
+			void *buffer = TW_Allocate((void*)0, (void*)0, 1056 + sizeof(TwSlabBucket256), 1);
+			TwSlabBucket256 *hdr = (TwSlabBucket256*)((char*)buffer + 1056);
+			*hdr = TW_CreateSlabBucket256(buffer);
+			bucket->next = hdr;
+			flag = 0;
+			break;
+		}
+
+		bucket = bucket->next;
+	}
+
+	int pos = 31 - flag;
+	bucket->usedBitField |= 1u << pos;
+	return (char*)bucket->first + (pos << 5);
+}
+
+int TW_RemoveSb256Item(TwSlabBucket256 *bucket, void *item) {
+	unsigned itemAddr = (unsigned)item;
+	while (bucket) {
+		unsigned firstAddr = (unsigned)bucket->first;
+		if (itemAddr >= firstAddr && itemAddr < firstAddr + 1024) {
+			int pos = (itemAddr - firstAddr) >> 5;
+			bucket->usedBitField &= ~(1 << pos);
+			return 1;
+		}
+		bucket = bucket->next;
+	}
+	return 0;
+}
+
 void TW_AwaitFuture(TwFuture *future, int timeoutMs) {
 	
 }

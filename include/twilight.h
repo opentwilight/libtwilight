@@ -83,6 +83,14 @@ typedef struct {
 	unsigned *values;
 } TwHashMap;
 
+struct _tw_slab_bucket_256 {
+	unsigned usedBitField; // book-keeping, so we know which slots have been used
+	void *buffer; // so we know what to free
+	void *first; // buffer, but aligned to the next 256 bits (32 bytes)
+	_tw_slab_bucket_256 *next;
+};
+typedef struct _tw_slab_bucket_256 TwSlabBucket256;
+
 typedef struct {
 	TwCondition cond;
 	TwMutex mtx;
@@ -149,6 +157,9 @@ extern unsigned TW_AddAtomic(unsigned *address, int delta);
 extern unsigned TW_OrAtomic(unsigned *address, unsigned value);
 extern unsigned TW_XorAtomic(unsigned *address, unsigned value);
 extern unsigned TW_AndAtomic(unsigned *address, unsigned value);
+extern unsigned TW_CountLeadingZeros(unsigned value);
+extern int TW_CountBits(unsigned value);
+extern int TW_HasOneBitSet(unsigned value);
 extern void *TW_CopyBytes(void *dst, const void *src, int len);
 extern void *TW_FillBytes(void *dst, unsigned char byte, int len);
 unsigned TW_DivideU64(unsigned long long *value, unsigned base);
@@ -181,25 +192,34 @@ unsigned TW_GetStringHash(const char *str, int len);
 TwHashMap TW_MakeFixedMap(const char **keys, void **keySlots, unsigned *values, int count);
 int TW_GetHashMapIndex(TwHashMap *map, const char *key, int len);
 
+TwSlabBucket256 TW_CreateSlabBucket256(char *buffer);
+void *TW_AddSb256Item(TwSlabBucket256 *bucket);
+int TW_RemoveSb256Item(TwSlabBucket256 *bucket, void *item);
+
+void TW_AwaitFuture(TwFuture *future, int timeoutMs);
+void TW_CompleteFuture(TwFuture *future, void *value);
+void TW_FailFuture(TwFuture *future, int res);
+void TW_ReachFuture(TwFuture *future, void *value, int res);
+
 // strformat.c
 int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...);
 int TW_FormatStringV(TwStream *sink, int maxOutputSize, const char *str, va_list args);
 int TW_WriteInteger(char *outBuf, int maxSize, int minWidth, unsigned bits, unsigned base, unsigned flags, unsigned long long value);
 int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int mode, double value);
 
-// threading.c
-// TODO: General concurrent objects
+// threading
 // TODO: General thread pool
+void TW_SetupThreading(void);
 int TW_MultiThreadingEnabled(void);
 void TW_StartThread(void *userData, void *(*entry)(void*));
+TwMutex TW_CreateMutex(void);
 void TW_LockMutex(TwMutex mtx);
 void TW_UnlockMutex(TwMutex mtx);
-void TW_AwaitCondition(TwCondition cond, int timeoutMs);
-void TW_BroadcastCondition(TwCondition cond);
-void TW_AwaitFuture(TwFuture *future, int timeoutMs);
-void TW_CompleteFuture(TwFuture *future, void *value);
-void TW_FailFuture(TwFuture *future, int res);
-void TW_ReachFuture(TwFuture *future, void *value, int res);
+void TW_DestroyMutex(TwMutex mutex);
+TwCondition TW_CreateCondition(void);
+void TW_AwaitCondition(TwCondition cv, TwMutex mutex, int timeoutMs);
+void TW_BroadcastCondition(TwCondition cv, TwMutex mutex);
+void TW_DestroyCondition(TwCondition cv);
 
 // file.c
 TwFile *TW_GetFile(int fd);

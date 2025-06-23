@@ -38,6 +38,8 @@ TW_DisableInterrupts:
 
 .globl TW_CompareAndSwapAtomic // bool TW_CompareAndSwapAtomic(unsigned *address, unsigned expected, unsigned newValue)
 TW_CompareAndSwapAtomic:
+	sync
+	isync
 	// reserve the 32 byte cache block, so that we know if we were interrupted before we could complete the swap
 	lwarx 6, 0, 3
 	// select newValue if r6 == expected, else keep the old value
@@ -58,6 +60,8 @@ TW_CompareAndSwapAtomic:
 
 .globl TW_GetAndSetAtomic // unsigned TW_GetAndSetAtomic(unsigned *address, unsigned newValue)
 TW_GetAndSetAtomic:
+	sync
+	isync
 	lwarx 6, 0, 3
 	stwcx. 4, 0, 3
 	bne TW_GetAndSetAtomic
@@ -66,6 +70,8 @@ TW_GetAndSetAtomic:
 
 .globl TW_AddAtomic // unsigned TW_AddAtomic(unsigned *address, int delta)
 TW_AddAtomic:
+	sync
+	isync
 	lwarx 6, 0, 3
 	add 6, 6, 4
 	stwcx. 6, 0, 3
@@ -75,6 +81,8 @@ TW_AddAtomic:
 
 .globl TW_OrAtomic // unsigned TW_OrAtomic(unsigned *address, unsigned value)
 TW_OrAtomic:
+	sync
+	isync
 	lwarx 6, 0, 3
 	or 6, 6, 4
 	stwcx. 6, 0, 3
@@ -84,6 +92,8 @@ TW_OrAtomic:
 
 .globl TW_XorAtomic // unsigned TW_XorAtomic(unsigned *address, unsigned value)
 TW_XorAtomic:
+	sync
+	isync
 	lwarx 6, 0, 3
 	xor 6, 6, 4
 	stwcx. 6, 0, 3
@@ -93,6 +103,8 @@ TW_XorAtomic:
 
 .globl TW_AndAtomic // unsigned TW_AndAtomic(unsigned *address, unsigned value)
 TW_AndAtomic:
+	sync
+	isync
 	lwarx 6, 0, 3
 	and 6, 6, 4
 	stwcx. 6, 0, 3

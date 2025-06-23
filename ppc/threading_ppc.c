@@ -14,6 +14,14 @@ struct _tw_thread {
 };
 struct _tw_thread _tw_threads[TW_PPC_MAX_THREADS];
 
+// 32+1 256-bit (or 32 byte) blocks. +1 to account for padding.
+char _tw_first_threading_prims_buf[1056];
+TwSlabBucket256 _tw_threading_primitives = {};
+
+void TW_SetupThreading(void) {
+	_tw_threading_primitives = TW_CreateSlabBucket256(_tw_first_threading_prims_buf);
+}
+
 int TW_MultiThreadingEnabled(void) {
 	return 0;
 }
@@ -45,18 +53,58 @@ int TW_StartThread(void *userData, void *(*entry)(void*)) {
 	TW_EnableInterrupts();
 }
 
+TwMutex TW_CreateMutex(void) {
+	void *ptr = TW_AddSb256Item(&_tw_threading_primitives);
+	TW_ZeroAndFlushBlock(ptr);
+	return ptr;
+}
+
+// TODO a lot of testing required here
+
 void TW_LockMutex(TwMutex mutex) {
-	
+	unsigned prev = TW_GetAndSetAtomic((unsigned*)mutex, 1);
+	if (prev == 0)
+		return; // uncontended
+
+	// TODO
+	// add this thread to a list of sleeping threads
+	// check if we're now deadlocked
+	// maybe switch context so someone else gets a go
+
+	TW_EnableInterrupts(); // otherwise we'd definitely be blocked
+
+	while (TW_GetAndSetAtomic((unsigned*)mutex, 1));
+
+	// TODO remove this thread from the list of sleeping threads
 }
 
 void TW_UnlockMutex(TwMutex mutex) {
-	
+	unsigned prev = TW_GetAndSetAtomic((unsigned*)mutex, 0);
 }
 
-void TW_AwaitCondition(TwCondition cond, int timeoutMs) {
-	
+void TW_DestroyMutex(TwMutex mutex) {
+	TW_RemoveSb256Item(&_tw_threading_primitives, mutex);
 }
 
-void TW_BroadcastCondition(TwCondition cond) {
-	
+TwCondition TW_CreateCondition(void) {
+	void *ptr = TW_AddSb256Item(&_tw_threading_primitives);
+	TW_ZeroAndFlushBlock(ptr);
+	return ptr;
+}
+
+void TW_AwaitCondition(TwCondition cv, TwMutex mutex, int timeoutMs) {
+	TW_UnlockMutex(mutex);
+	TW_GetAndSetAtomic((unsigned*)cv, 1);
+	TW_EnableInterrupts();
+	// TODO maybe switch context here so someone else gets a go
+	while (TW_CompareAndSwapAtomic((unsigned*)cv, 0, 0));
+	TW_LockMutex(mutex);
+}
+
+void TW_BroadcastCondition(TwCondition cv, TwMutex mutex) {
+	TW_GetAndSetAtomic((unsigned*)cv, 0);
+}
+
+void TW_DestroyCondition(TwCondition cv) {
+	TW_RemoveSb256Item(&_tw_threading_primitives, cv);
 }
