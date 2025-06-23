@@ -334,7 +334,7 @@ void *TW_AddSb256Item(TwSlabBucket256 *bucket) {
 	int flag = 32;
 	while (1) {
 		unsigned unused = ~bucket->usedBitField;
-		flag = TW_CountLeadingZeroes(unused);
+		flag = TW_CountLeadingZeros(unused);
 		if (flag < 32)
 			break;
 

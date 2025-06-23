@@ -87,7 +87,7 @@ struct _tw_slab_bucket_256 {
 	unsigned usedBitField; // book-keeping, so we know which slots have been used
 	void *buffer; // so we know what to free
 	void *first; // buffer, but aligned to the next 256 bits (32 bytes)
-	_tw_slab_bucket_256 *next;
+	struct _tw_slab_bucket_256 *next;
 };
 typedef struct _tw_slab_bucket_256 TwSlabBucket256;
 
@@ -211,7 +211,7 @@ int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int m
 // TODO: General thread pool
 void TW_SetupThreading(void);
 int TW_MultiThreadingEnabled(void);
-void TW_StartThread(void *userData, void *(*entry)(void*));
+int TW_StartThread(void *userData, void *(*entry)(void*));
 TwMutex TW_CreateMutex(void);
 void TW_LockMutex(TwMutex mtx);
 void TW_UnlockMutex(TwMutex mtx);

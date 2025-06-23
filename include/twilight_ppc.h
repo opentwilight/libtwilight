@@ -236,6 +236,7 @@ extern void *TW_GetInterruptStackStart(void);
 extern void *TW_GetMainStackStart(void);
 extern unsigned TW_EnableInterrupts(void);
 extern unsigned TW_DisableInterrupts(void);
+extern void TW_ZeroAndFlushBlock(unsigned *cacheBlockAlignedAddress);
 extern void *TW_FlushMemory(void *ptr, int size);
 extern void *TW_SyncAfterWrite(void *ptr, int size);
 extern void *TW_SyncBeforeRead(void *ptr, int size);

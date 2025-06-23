@@ -112,6 +112,27 @@ TW_AndAtomic:
 	mr 3, 6
 	blr
 
+.globl TW_ZeroAndFlushBlock // void TW_ZeroAndFlushBlock(unsigned *cacheBlockAlignedAddress)
+TW_ZeroAndFlushBlock:
+	mr 4, 30
+	mr 5, 31
+	li 24, 0
+	li 25, 0
+	li 26, 0
+	li 27, 0
+	li 28, 0
+	li 29, 0
+	li 30, 0
+	li 31, 0
+	dcbt 0, 3
+	stmw 24, 0(3)
+	dcbf 0, 3
+	dcbst 0, 3
+	sync
+	mr 30, 4
+	mr 31, 5
+	blr
+
 .globl TW_FlushMemory // void *TW_FlushMemory(void *ptr, int size)
 TW_FlushMemory:
 	add 5, 3, 4

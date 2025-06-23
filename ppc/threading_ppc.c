@@ -33,9 +33,9 @@ int TW_StartThread(void *userData, void *(*entry)(void*)) {
 		_tw_next_id = 2;
 	int id = _tw_next_id;
 
-	_tw_thread *thread = (void*)0;
+	struct _tw_thread *thread = (void*)0;
 	for (int i = 0; i < TW_PPC_MAX_THREADS; i++) {
-		_tw_thread *t = &_tw_threads[(id + i) % TW_PPC_MAX_THREADS];
+		struct _tw_thread *t = &_tw_threads[(id + i) % TW_PPC_MAX_THREADS];
 		if ((t->flags & 1) == 0) {
 			thread = t;
 			break;
@@ -47,7 +47,9 @@ int TW_StartThread(void *userData, void *(*entry)(void*)) {
 		thread->id = id;
 		thread->entry = entry;
 		thread->userData = userData;
-		TW_FillWords(&thread->registers, 0, sizeof(TW_PpcCpuContext) / 4 + 1);
+		unsigned *regs = (unsigned*)&thread->registers;
+		for (int i = 0; i < sizeof(TW_PpcCpuContext) / 4; i++)
+			regs[i] = 0;
 	}
 
 	TW_EnableInterrupts();
