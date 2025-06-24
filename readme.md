@@ -30,8 +30,11 @@ Install LLVM and Clang.
 		- Select which USB device, ie. dive through hubs
 	- Disk layer
 		- Select partition, or just use the first partition
+		- MBR
+		- Wii/GC disk partition layout format
 	- Filesystem layer
 		- FAT32
+		- Wii/GC disk FST
 		- API for 3rd party filesystem driver implementations
 	- POSIX file wrapper
 		- open, read, write, flush, close, etc.
@@ -39,7 +42,9 @@ Install LLVM and Clang.
 		- mount table (accessible through string path)
 - Custom threading implementation
 	- Use decrement register for scheduling software interrupts
-	- Synchronisation primitives (atomics, semaphores, etc)
+	- Timeouts in `TW_AwaitCondition`
+	- Maybe schedule other threads in `TW_LockMutex` and `TW_AwaitCondition`
+	- Check for deadlock if waiting in `TW_LockMutex` and `TW_AwaitCondition`
 - Build Tools
 	- ELF to DOL
 	- FST generator
@@ -53,10 +58,6 @@ Install LLVM and Clang.
 	- Different kinds of controllers
 	- Interrupts, for input events (ie. notfiy instead of just poll)
 - GX
-	- More maths
-		- Matrices
-		- Quaternions
-		- Fast trig
 	- Display lists
 	- Textures
 	- Pipelines
@@ -80,15 +81,8 @@ Install LLVM and Clang.
 			- API for implementing custom HID device (eg. keyboard, mouse)
 	- SD
 	- NAND
+	- DVD
 	- Wifi
-
-Still deciding whether to implement the interface for every IOS module on PPC (eg. ES, STM, etc)...
-
-Or if this project can make it easy for people to deploy their own Starlet code,
-maybe a lot of IOS concepts are no longer relevant.
-
-So perhaps it would make more sense for people to just issue raw IOS calls themselves,
-allowing them to take advantage of a potentially different Starlet firmware.
 
 ## Might implement later
 
@@ -105,6 +99,7 @@ allowing them to take advantage of a potentially different Starlet firmware.
 	- Wavebird
 	- Serial keyboard
 	- Wii motion plus
+- Implement the interface for every IOS module on PPC (eg. ES, STM, etc)...
 - Write Starlet (ARM) programs with a shared common codebase
 	- Examples:
 		- Modern, concurrent TCP/IP Stack (eg. HTTP2, HTTP3)

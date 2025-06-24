@@ -53,6 +53,7 @@ int TW_StartThread(void *userData, void *(*entry)(void*)) {
 	}
 
 	TW_EnableInterrupts();
+	return 0;
 }
 
 TwMutex TW_CreateMutex(void) {
@@ -99,7 +100,8 @@ int TW_AwaitCondition(TwCondition cv, TwMutex mutex, int timeoutMs) {
 	TW_GetAndSetAtomic((unsigned*)cv, 1);
 	TW_EnableInterrupts();
 	// TODO maybe switch context here so someone else gets a go
-	while (TW_CompareAndSwapAtomic((unsigned*)cv, 1, 0, 0));
+	while ((PEEK_U32((unsigned)cv) & 1) == 0)
+		PPC_SYNC();
 	TW_LockMutex(mutex);
 	// TODO return bool indicating whether we timed out
 	return 0;

@@ -5,38 +5,45 @@ static TwFileProperties _tw_sdcard_getProperties(struct tw_file *file) {
 	return props;
 }
 
-static int _tw_sdcard_read(struct tw_file *file, void *data, int size) {
-	return 0;
+static void _tw_sdcard_read(struct tw_file *file, void *userData, void *data, int size, TwIoCompletion completionHandler) {
+	int res = 0;
+	completionHandler(file, userData, TW_FILE_METHOD_READ, res);
 }
 
-static int _tw_sdcard_write(struct tw_file *file, void *data, int size) {
-	return 0;
+static void _tw_sdcard_write(struct tw_file *file, void *userData, void *data, int size, TwIoCompletion completionHandler) {
+	int res = 0;
+	completionHandler(file, userData, TW_FILE_METHOD_WRITE, res);
 }
 
-static long long _tw_sdcard_seek(struct tw_file *file, long long seekAmount, int whence) {
-	return 0;
+static void _tw_sdcard_seek(struct tw_file *file, void *userData, long long seekAmount, int whence, TwIoCompletion64 completionHandler) {
+	int res = 0;
+	completionHandler(file, userData, TW_FILE_METHOD_SEEK, (long long)res);
 }
 
-static int _tw_sdcard_ioctl(struct tw_file *file, unsigned method, void *input, int inputSize, void *output, int outputSize) {
-	return 0;
+static void _tw_sdcard_ioctl(struct tw_file *file, void *userData, unsigned method, void *input, int inputSize, void *output, int outputSize, TwIoCompletion completionHandler) {
+	int res = 0;
+	completionHandler(file, userData, TW_FILE_METHOD_IOCTL, res);
 }
 
-static int _tw_sdcard_ioctlv(struct tw_file *file, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs) {
-	return 0;
+static void _tw_sdcard_ioctlv(struct tw_file *file, void *userData, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs, TwIoCompletion completionHandler) {
+	int res = 0;
+	completionHandler(file, userData, TW_FILE_METHOD_IOCTLV, res);
 }
 
-static int _tw_sdcard_flush(struct tw_file *file) {
-	return 0;
+static void _tw_sdcard_flush(struct tw_file *file, void *userData, TwIoCompletion completionHandler) {
+	int res = 0;
+	completionHandler(file, userData, TW_FILE_METHOD_FLUSH, res);
 }
 
-static int _tw_sdcard_close(struct tw_file *file) {
-	return 0;
+static void _tw_sdcard_close(struct tw_file *file, void *userData, TwIoCompletion completionHandler) {
+	int res = 0;
+	completionHandler(file, userData, TW_FILE_METHOD_CLOSE, res);
 }
 
 TwFile *TW_OpenSdCard(void) {
-	TwFile *sd = TW_OpenFile(TW_MODE_RDWR, "/ios/sdio/slot0");
+	TwFile *sd = TW_OpenFileSync(TW_MODE_RDWR, "/ios/sdio/slot0");
 	if (sd->type != TW_FILE_TYPE_IOS) {
-		sd->close(sd);
+		TW_CloseFileSync(sd);
 		return (void*)0;
 	}
 

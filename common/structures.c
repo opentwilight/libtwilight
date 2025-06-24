@@ -320,7 +320,7 @@ int TW_GetHashMapIndex(TwHashMap *map, const char *key, int len) {
 // if you don't know the alignment, assume misalignment = 32
 // so, 1056 bytes.
 TwSlabBucket256 TW_CreateSlabBucket256(char *buffer) {
-	char *ptr = (char*)(((unsigned)buffer) + 0x1f) & ~0x1f);
+	char *ptr = (char*)((((unsigned)buffer) + 0x1fU) & ~0x1fU);
 	TwSlabBucket256 bucket = {
 		.usedBitField = 0,
 		.buffer = buffer,
@@ -369,7 +369,7 @@ int TW_RemoveSb256Item(TwSlabBucket256 *bucket, void *item) {
 	return 0;
 }
 
-TwFuture TW_MakeFuture(unsigned initialResult, unsigned initialError) {
+TwFuture TW_CreateFuture(unsigned initialResult, unsigned initialError) {
 	TwMutex mtx = TW_CreateMutex();
 	TwCondition cv = TW_CreateCondition();
 	TwFuture f = (TwFuture)cv;
@@ -425,3 +425,7 @@ void TW_ReachFuture(TwFuture future, unsigned result, unsigned error) {
 	TW_GetAndSetAtomic((unsigned*)future, 3); // broadcast condition and set done status
 	TW_UnlockMutex(future->mtx);
 }
+
+void TW_DestroyFuture(TwFuture future) { // O_o
+	TW_DestroyCondition((TwCondition)future);
+};

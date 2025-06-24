@@ -24,6 +24,16 @@
 #define TW_FILE_TYPE_DISK     2
 #define TW_FILE_TYPE_IOS      3
 
+#define TW_FILE_METHOD_NONE   0
+#define TW_FILE_METHOD_OPEN   1
+#define TW_FILE_METHOD_CLOSE  2
+#define TW_FILE_METHOD_READ   3
+#define TW_FILE_METHOD_WRITE  4
+#define TW_FILE_METHOD_SEEK   5
+#define TW_FILE_METHOD_IOCTL  6
+#define TW_FILE_METHOD_IOCTLV 7
+#define TW_FILE_METHOD_FLUSH  8
+
 // TODO: Thread local storage for the first N threads that ask for one (eg. N = 4)
 // TODO: Thread pools
 
@@ -200,11 +210,12 @@ TwSlabBucket256 TW_CreateSlabBucket256(char *buffer);
 void *TW_AddSb256Item(TwSlabBucket256 *bucket);
 int TW_RemoveSb256Item(TwSlabBucket256 *bucket, void *item);
 
-TwFuture TW_MakeFuture(unsigned initialResult, unsigned initialError);
+TwFuture TW_CreateFuture(unsigned initialResult, unsigned initialError);
 unsigned long long TW_AwaitFuture(TwFuture future);
 int TW_AwaitFutureForTheNext(TwFuture future, int timeoutMs, unsigned long long *resultErrorPtr);
 int TW_PeekFuture(TwFuture future, unsigned long long *resultErrorPtr);
 void TW_ReachFuture(TwFuture future, unsigned value, unsigned error);
+void TW_DestroyFuture(TwFuture future); // o_O
 
 // strformat.c
 int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...);
@@ -230,8 +241,15 @@ void TW_DestroyCondition(TwCondition cv);
 TwFile *TW_GetFile(int fd);
 TwFile *TW_SetFile(int fd, TwFile file);
 int TW_AddFile(TwFile file, TwFile **fileOut);
-TwFile TW_MakeStdin(int (*read)(TwFile*, void*, int));
-TwFile TW_MakeStdout(int (*write)(TwFile*, void*, int));
+TwFile TW_MakeStdin(void (*read)(TwFile*, void *, void*, int, TwIoCompletion));
+TwFile TW_MakeStdout(void (*write)(TwFile*, void *, void*, int, TwIoCompletion));
+int TW_ReadFileSync(TwFile *file, void *data, int size);
+int TW_WriteFileSync(TwFile *file, void *data, int size);
+long long TW_SeekFileSync(TwFile *file, long long seekAmount, int whence);
+int TW_IoctlFileSync(TwFile *file, unsigned method, void *input, int inputSize, void *output, int outputSize);
+int TW_IoctlvFileSync(TwFile *file, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs);
+int TW_FlushFileSync(TwFile *file);
+int TW_CloseFileSync(TwFile *file);
 
 // filesystem.c
 void TW_RegisterPartitionParser(unsigned tag, int (*partitionParser)(TwFile *device, TwPartition outerPartition, TwFlexArray *partitionsOut));
@@ -247,8 +265,8 @@ int TW_ListDirectory(unsigned flags, const char *path, TwStream *output);
 int TW_CreateDirectory(unsigned flags, const char *path);
 int TW_DeleteDirectory(unsigned flags, const char *path);
 int TW_RenameDirectory(unsigned flags, const char *oldPath, int oldPathLen, const char *newPath, int newPathLen);
-TwFile *TW_OpenFile(unsigned flags, const char *path);
-TwFile *TW_CreateFile(unsigned flags, long long initialSize, const char *path);
+TwFile *TW_OpenFileSync(unsigned flags, const char *path);
+TwFile *TW_CreateFileSync(unsigned flags, long long initialSize, const char *path);
 int TW_DeleteFile(unsigned flags, const char *path);
 int TW_ResizeFile(unsigned flags, long long newSize, const char *path);
 int TW_RenameFile(unsigned flags, const char *oldPath, int oldPathLen, const char *newPath, int newPathLen);

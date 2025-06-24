@@ -239,6 +239,7 @@ _copy_irq_handler:
 #endif
 	sync
 
+	bl TW_SetupThreading
 	bl TW_SetDefaultCrashHandlers
 	bl TW_EnableInterrupts
 	li 3, 0

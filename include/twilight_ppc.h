@@ -131,6 +131,17 @@ typedef struct {
 
 #endif
 
+typedef struct {
+	unsigned gprs[32];
+	double fprs[32];
+	unsigned ctr;
+	unsigned xer;
+	unsigned lr;
+	unsigned cr;
+	unsigned fpscr;
+	unsigned usia;
+} TW_PpcCpuContext;
+
 typedef union {
 	unsigned words[2];
 	struct {

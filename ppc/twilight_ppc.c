@@ -12,12 +12,13 @@ static TwTerminal _g_default_terminal = {
 	.back = 0x00800080,
 };
 
-static int _tw_stdin_read(TwFile *file, void *buf, int size) {
-	return 0;
+static void _tw_stdin_read(TwFile *file, void *userData, void *buf, int size, TwIoCompletion completionHandler) {
+	completionHandler(file, userData, TW_FILE_METHOD_READ, 0);
 }
 
-static int _tw_stdout_file_write(TwFile *file, void *buf, int size) {
-	return TW_PrintTerminal(&_g_default_terminal, (void*)0, TW_GetDefaultVideo(), (char*)buf, size);
+static void _tw_stdout_file_write(TwFile *file, void *userData, void *buf, int size, TwIoCompletion completionHandler) {
+	int res = TW_PrintTerminal(&_g_default_terminal, (void*)0, TW_GetDefaultVideo(), (char*)buf, size);
+	completionHandler(file, userData, TW_FILE_METHOD_WRITE, res);
 }
 
 static int _tw_stdout_stream_write(TwStream *stream, char *buf, int size) {
@@ -28,10 +29,10 @@ static void init_twilight() {
 	int fb_size;
 	unsigned framebuffer = TW_GetFramebufferAddress(&fb_size);
 	_g_tw_heap = TW_MakeHeapAllocator((void*)(framebuffer + fb_size), (void*)TW_MEM1_END);
-	_g_tw_heap.mutex = (void*)1; // use interrupt toggle as the lock, ie. global
+	_g_tw_heap.mutex = TW_CreateMutex();
 #ifdef TW_WII
 	_g_tw_heap_ex = TW_MakeHeapAllocator((void*)TW_MEM2_START, (void*)TW_IOS_MEM_START);
-	_g_tw_heap_ex.mutex = (void*)1;
+	_g_tw_heap_ex.mutex = TW_CreateMutex();
 	_g_tw_heap.next = &_g_tw_heap_ex;
 	TwFilesystem ios_fs = TW_MakeIosFilesystem();
 	TW_MountFilesystem(&ios_fs, "/ios");

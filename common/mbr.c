@@ -1,12 +1,12 @@
 #include <twilight.h>
 
 int TW_ParseMbrPartitions(TwFile *device, TwPartition outerPartition, TwFlexArray *partitionsOut) {
-	int res = device->seek(device, outerPartition.offsetBytes + 0x1be, TW_SEEK_SET);
+	int res = TW_SeekFileSync(device, outerPartition.offsetBytes + 0x1be, TW_SEEK_SET);
     if (res < 0)
         return -1;
 
 	char buf[0x42];
-    res = device->read(device, buf, 0x42);
+    res = TW_ReadFileSync(device, buf, 0x42);
     if (res < 0x42 || buf[0x40] != 0x55 || buf[0x41] != 0xaa)
         return -2;
 

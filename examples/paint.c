@@ -142,7 +142,7 @@ int loadImage(TwVideo *video, TwFile *imageFile) {
 	int fileSize = (int)fileProps.totalSize;
 
 	MyImageFormat header;
-	if (imageFile->read(imageFile, &header, sizeof(MyImageFormat)) != sizeof(MyImageFormat)) {
+	if (TW_ReadFileSync(imageFile, &header, sizeof(MyImageFormat)) != sizeof(MyImageFormat)) {
 		TW_Printf("Failed to read header from image file");
 		return -2;
 	}
@@ -160,7 +160,7 @@ int loadImage(TwVideo *video, TwFile *imageFile) {
 		return -4;
 	}
 
-	int res = imageFile->read(imageFile, data, fileSize);
+	int res = TW_ReadFileSync(imageFile, data, fileSize);
 	if (res <= 0) {
 		TW_Printf("Failed to read image data past the header");
 		TW_Free(NULL, data);
@@ -182,7 +182,7 @@ int loadImage(TwVideo *video, TwFile *imageFile) {
 }
 
 int saveImage(TwVideo *video, TwFile *imageFile) {
-	long long seekRes = imageFile->seek(imageFile, 0, TW_SEEK_SET);
+	long long seekRes = TW_SeekFileSync(imageFile, 0, TW_SEEK_SET);
 	if (seekRes == -1LL) {
 		TW_Printf("Failed to seek to beginning of image file for output");
 		return -1;
@@ -194,7 +194,7 @@ int saveImage(TwVideo *video, TwFile *imageFile) {
 		.height = (video->height - HUD_BOTTOM - HUD_TOP) * video->width,
 	};
 
-	int res = imageFile->write(imageFile, &header, sizeof(MyImageFormat));
+	int res = TW_WriteFileSync(imageFile, &header, sizeof(MyImageFormat));
 	if (res != sizeof(MyImageFormat)) {
 		TW_Printf("Failed to write image header");
 		return -2;
@@ -210,7 +210,7 @@ int saveImage(TwVideo *video, TwFile *imageFile) {
 		header.height
 	);
 
-	res = imageFile->write(imageFile, output.data, output.size);
+	res = TW_WriteFileSync(imageFile, output.data, output.size);
 	TW_FreeFlexArray(&output);
 
 	if (res != output.size) {
@@ -297,9 +297,9 @@ int main() {
 		return 1;
 	}
 
-	TwFile *imageFile = TW_OpenFile(TW_MODE_RDWR, "/sd/paint.pb");
+	TwFile *imageFile = TW_OpenFileSync(TW_MODE_RDWR, "/sd/paint.pb");
 	if (!imageFile) {
-		imageFile = TW_CreateFile(TW_MODE_RDWR, 0, "/sd/paint.pb");
+		imageFile = TW_CreateFileSync(TW_MODE_RDWR, 0, "/sd/paint.pb");
 		if (!imageFile) {
 			TW_Printf("Failed to open or create /sd/paint.pb on SD card");
 			return 2;
@@ -346,7 +346,7 @@ int main() {
 	}
 
 	saveImage(&video, imageFile);
-	sd->close(sd);
+	TW_CloseFileSync(sd);
 
 	return 0;
 }

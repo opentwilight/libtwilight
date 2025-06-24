@@ -115,7 +115,7 @@ int TW_RenameDirectory(unsigned flags, const char *oldPath, int oldPathLen, cons
 	return 0;
 }
 
-TwFile *TW_OpenFile(unsigned flags, const char *path) {
+TwFile *TW_OpenFileSync(unsigned flags, const char *path) {
 	int len;
 	for (len = 0; path[len]; len++);
 	int fsRootOff = 0;
@@ -129,7 +129,7 @@ TwFile *TW_OpenFile(unsigned flags, const char *path) {
 	return filePtr;
 }
 
-TwFile *TW_CreateFile(unsigned flags, long long initialSize, const char *path) {
+TwFile *TW_CreateFileSync(unsigned flags, long long initialSize, const char *path) {
 	return (TwFile*)0;
 }
 

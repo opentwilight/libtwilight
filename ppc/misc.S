@@ -43,9 +43,9 @@ TW_CompareAndSwapAtomic:
 	// reserve the 32 byte cache block, so that we know if we were interrupted before we could complete the swap
 	lwarx 7, 0, 3
 	// select newValue if r7 == expected, else keep the old value
-	and 7, 7, 4             // bitwise AND the loaded value with the expected mask
+	and 9, 7, 4             // bitwise AND the loaded value with the expected mask
 	and 8, 5, 4             // bitwise AND the expected value with the expected mask
-	sub 8, 7, 8             // get the difference between the two
+	sub 8, 9, 8             // get the difference between the two
 	neg 9, 8                // negate and OR ensures the top bit of is set if and only if there is a difference
 	or 8, 8, 9
 	rlwinm 8, 8, 1, 31, 31  // shift right by 31, so we have it in the least significant bit

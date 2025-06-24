@@ -9,20 +9,23 @@ static TwFileProperties _defaultGetProperties(TwFile *file) {
 	TwFileProperties empty = {0};
 	return empty;
 }
-static int _defaultTransfer(TwFile *file, void *buf, int size) {
-	return 0;
+static void _defaultRead(TwFile *file, void *userData, void *buf, int size, TwIoCompletion completionHandler) {
+	completionHandler(file, userData, TW_FILE_METHOD_READ, 0);
 }
-static long long _defaultSeek(TwFile *file, long long seekAmount, int whence) {
-	return 0;
+static void _defaultWrite(TwFile *file, void *userData, void *buf, int size, TwIoCompletion completionHandler) {
+	completionHandler(file, userData, TW_FILE_METHOD_WRITE, 0);
 }
-static int _defaultFlush(TwFile *file) {
-	return 0;
+static void _defaultSeek(TwFile *file, void *userData, long long seekAmount, int whence, TwIoCompletion64 completionHandler) {
+	completionHandler(file, userData, TW_FILE_METHOD_SEEK, 0);
 }
-static int _defaultClose(TwFile *file) {
-	return 0;
+static void _defaultFlush(TwFile *file, void *userData, TwIoCompletion completionHandler) {
+	completionHandler(file, userData, TW_FILE_METHOD_FLUSH, 0);
+}
+static void _defaultClose(TwFile *file, void *userData, TwIoCompletion completionHandler) {
+	completionHandler(file, userData, TW_FILE_METHOD_CLOSE, 0);
 }
 
-TwFile TW_MakeStdin(int (*read)(TwFile*, void*, int)) {
+TwFile TW_MakeStdin(void (*read)(TwFile*, void *, void*, int, TwIoCompletion)) {
 	TwFile file = (TwFile) {
 		.getProperties = _defaultGetProperties,
 		.seek = _defaultSeek,
@@ -30,18 +33,18 @@ TwFile TW_MakeStdin(int (*read)(TwFile*, void*, int)) {
 		.close = _defaultClose,
 	};
 	file.read = read;
-	file.write = _defaultTransfer;
+	file.write = _defaultWrite;
 	return file;
 }
 
-TwFile TW_MakeStdout(int (*write)(TwFile*, void*, int)) {
+TwFile TW_MakeStdout(void (*write)(TwFile*, void*, void*, int, TwIoCompletion)) {
 	TwFile file = (TwFile) {
 		.getProperties = _defaultGetProperties,
 		.seek = _defaultSeek,
 		.flush = _defaultFlush, // Maybe add a non-dummy flush method
 		.close = _defaultClose,
 	};
-	file.read = _defaultTransfer;
+	file.read = _defaultRead;
 	file.write = write;
 	return file;
 }
@@ -99,4 +102,70 @@ int TW_AddFile(TwFile file, TwFile **fileOut) {
 	if (fileOut)
 		*fileOut = (TwFile*)0;
 	return -1;
+}
+
+static void _tw_sync_io_completion_handler(struct tw_file *file, void *userData, int method, int result) {
+	TwFuture f = (TwFuture)userData;
+	TW_ReachFuture(f, (unsigned)(result & 0xFFFFffffLL), 0);
+}
+
+static void _tw_sync_io_completion_handler_64(struct tw_file *file, void *userData, int method, long long result) {
+	TwFuture f = (TwFuture)userData;
+	TW_ReachFuture(f, (unsigned)(result & 0xFFFFffffLL), (unsigned)((result >> 32) & 0xFFFFffffLL));
+}
+
+int TW_ReadFileSync(TwFile *file, void *data, int size) {
+	TwFuture f = TW_CreateFuture(0, 0);
+	file->read(file, f, data, size, _tw_sync_io_completion_handler);
+	unsigned long long resultError = TW_AwaitFuture(f);
+	TW_DestroyFuture(f);
+	return (int)(resultError & 0xFFFFffff);
+}
+
+int TW_WriteFileSync(TwFile *file, void *data, int size) {
+	TwFuture f = TW_CreateFuture(0, 0);
+	file->write(file, f, data, size, _tw_sync_io_completion_handler);
+	unsigned long long resultError = TW_AwaitFuture(f);
+	TW_DestroyFuture(f);
+	return (int)(resultError & 0xFFFFffff);
+}
+
+long long TW_SeekFileSync(TwFile *file, long long seekAmount, int whence) {
+	TwFuture f = TW_CreateFuture(0, 0);
+	file->seek(file, f, seekAmount, whence, _tw_sync_io_completion_handler_64);
+	unsigned long long resultError = TW_AwaitFuture(f);
+	TW_DestroyFuture(f);
+	return (long long)resultError;
+}
+
+int TW_IoctlFileSync(TwFile *file, unsigned method, void *input, int inputSize, void *output, int outputSize) {
+	TwFuture f = TW_CreateFuture(0, 0);
+	file->ioctl(file, f, method, input, inputSize, output, outputSize, _tw_sync_io_completion_handler);
+	unsigned long long resultError = TW_AwaitFuture(f);
+	TW_DestroyFuture(f);
+	return (int)(resultError & 0xFFFFffff);
+}
+
+int TW_IoctlvFileSync(TwFile *file, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs) {
+	TwFuture f = TW_CreateFuture(0, 0);
+	file->ioctlv(file, f, method, nInputs, nOutputs, inputsAndOutputs, _tw_sync_io_completion_handler);
+	unsigned long long resultError = TW_AwaitFuture(f);
+	TW_DestroyFuture(f);
+	return (int)(resultError & 0xFFFFffff);
+}
+
+int TW_FlushFileSync(TwFile *file) {
+	TwFuture f = TW_CreateFuture(0, 0);
+	file->flush(file, f, _tw_sync_io_completion_handler);
+	unsigned long long resultError = TW_AwaitFuture(f);
+	TW_DestroyFuture(f);
+	return (int)(resultError & 0xFFFFffff);
+}
+
+int TW_CloseFileSync(TwFile *file) {
+	TwFuture f = TW_CreateFuture(0, 0);
+	file->close(file, f, _tw_sync_io_completion_handler);
+	unsigned long long resultError = TW_AwaitFuture(f);
+	TW_DestroyFuture(f);
+	return (int)(resultError & 0xFFFFffff);
 }

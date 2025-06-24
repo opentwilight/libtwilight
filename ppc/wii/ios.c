@@ -51,7 +51,7 @@ static const char *_default_ios_devices[] = {
 	"/dev/wl0",
 };
 
-static unsigned _ios_buffer[32];
+static unsigned _ios_buffer[1032];
 
 int TW_ListIosFolder(unsigned flags, const char *path, int pathLen, TwStream *output) {
 	if (!path || pathLen <= 0)
@@ -163,29 +163,35 @@ TwFileProperties _get_ios_file_properties(struct tw_file *file) {
 	return props;
 }
 
-int _read_ios_file(struct tw_file *file, void *data, int size) {
-	return TW_ReadAlignedIos((int)file->params[0], data, size);
+void _read_ios_file(struct tw_file *file, void *userData, void *data, int size, TwIoCompletion completionHandler) {
+	int res = TW_ReadAlignedIos((int)file->params[0], data, size);
+	completionHandler(file, userData, TW_FILE_METHOD_READ, res);
 }
 
-int _write_ios_file(struct tw_file *file, void *data, int size) {
-	return TW_WriteAlignedIos((int)file->params[0], data, size);
+void _write_ios_file(struct tw_file *file, void *userData, void *data, int size, TwIoCompletion completionHandler) {
+	int res = TW_WriteAlignedIos((int)file->params[0], data, size);
+	completionHandler(file, userData, TW_FILE_METHOD_WRITE, res);
 }
 
-long long _seek_ios_file(struct tw_file *file, long long seekAmount, int type) {
+void _seek_ios_file(struct tw_file *file, void *userData, long long seekAmount, int whence, TwIoCompletion64 completionHandler) {
 	int delta = (int)seekAmount;
-	return (int)TW_SeekIos((int)file->params[0], type, delta);
+	int res = TW_SeekIos((int)file->params[0], whence, delta);
+	completionHandler(file, userData, TW_FILE_METHOD_SEEK, (long long)res);
 }
 
-int _ioctl_ios_file(struct tw_file *file, unsigned method, void *input, int inputSize, void *output, int outputSize) {
-	return TW_IoctlIos((int)file->params[0], method, input, inputSize, output, outputSize);
+void _ioctl_ios_file(struct tw_file *file, void *userData, unsigned method, void *input, int inputSize, void *output, int outputSize, TwIoCompletion completionHandler) {
+	int res = TW_IoctlIos((int)file->params[0], method, input, inputSize, output, outputSize);
+	completionHandler(file, userData, TW_FILE_METHOD_IOCTL, res);
 }
 
-int _ioctlv_ios_file(struct tw_file *file, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs) {
-	return TW_IoctlvIos((int)file->params[0], method, nInputs, nOutputs, inputsAndOutputs, 0);
+void _ioctlv_ios_file(struct tw_file *file, void *userData, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs, TwIoCompletion completionHandler) {
+	int res = TW_IoctlvIos((int)file->params[0], method, nInputs, nOutputs, inputsAndOutputs, 0);
+	completionHandler(file, userData, TW_FILE_METHOD_IOCTLV, res);
 }
 
-int _close_ios_file(struct tw_file *file) {
-	return TW_CloseIos((int)file->params[0]);
+void _close_ios_file(struct tw_file *file, void *userData, TwIoCompletion completionHandler) {
+	int res = TW_CloseIos((int)file->params[0]);
+	completionHandler(file, userData, TW_FILE_METHOD_CLOSE, res);
 }
 
 TwFile TW_OpenIosDevice(unsigned flags, const char *path, int pathLen) {
@@ -194,7 +200,7 @@ TwFile TW_OpenIosDevice(unsigned flags, const char *path, int pathLen) {
 	if (!path || pathLen <= 0)
 		return file;
 
-	char *ios_path = (char*)(((unsigned)&ios_path_unaligned[0] + 0x1f) & ~0x1f);
+	char *ios_path = (char*)((((unsigned)&ios_path_unaligned[0]) + 0x1f) & ~0x1f);
 	if (pathLen > 223)
 		pathLen = 223;
 	for (int i = 0; i < pathLen; i++)
