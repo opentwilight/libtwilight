@@ -94,17 +94,19 @@ TwCondition TW_CreateCondition(void) {
 	return ptr;
 }
 
-void TW_AwaitCondition(TwCondition cv, TwMutex mutex, int timeoutMs) {
+int TW_AwaitCondition(TwCondition cv, TwMutex mutex, int timeoutMs) {
 	TW_UnlockMutex(mutex);
 	TW_GetAndSetAtomic((unsigned*)cv, 1);
 	TW_EnableInterrupts();
 	// TODO maybe switch context here so someone else gets a go
-	while (TW_CompareAndSwapAtomic((unsigned*)cv, 0, 0));
+	while (TW_CompareAndSwapAtomic((unsigned*)cv, 1, 0, 0));
 	TW_LockMutex(mutex);
+	// TODO return bool indicating whether we timed out
+	return 0;
 }
 
 void TW_BroadcastCondition(TwCondition cv, TwMutex mutex) {
-	TW_GetAndSetAtomic((unsigned*)cv, 0);
+	TW_OrAtomic((unsigned*)cv, 1);
 }
 
 void TW_DestroyCondition(TwCondition cv) {

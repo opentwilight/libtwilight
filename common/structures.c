@@ -369,18 +369,59 @@ int TW_RemoveSb256Item(TwSlabBucket256 *bucket, void *item) {
 	return 0;
 }
 
-void TW_AwaitFuture(TwFuture *future, int timeoutMs) {
-	
+TwFuture TW_MakeFuture(unsigned initialResult, unsigned initialError) {
+	TwMutex mtx = TW_CreateMutex();
+	TwCondition cv = TW_CreateCondition();
+	TwFuture f = (TwFuture)cv;
+	f->cvValue = 0;
+	f->mtx = mtx;
+	f->result = initialResult;
+	f->error = initialError;
+	return f;
 }
 
-void TW_CompleteFuture(TwFuture *future, void *value) {
-	
+unsigned long long TW_AwaitFuture(TwFuture future) {
+	TW_LockMutex(future->mtx);
+	while ((future->cvValue & 2) == 0) {
+		TW_AwaitCondition((TwCondition)future, future->mtx, 0);
+	}
+	unsigned result = future->result;
+	unsigned error = future->error;
+	TW_UnlockMutex(future->mtx);
+	return ((unsigned long long)error << 32) | (unsigned long long)result;
 }
 
-void TW_FailFuture(TwFuture *future, int res) {
-	
+int TW_AwaitFutureForTheNext(TwFuture future, int timeoutMs, unsigned long long *resultErrorPtr) {
+	TW_LockMutex(future->mtx);
+	while ((future->cvValue & 2) == 0) {
+		int timedOut = TW_AwaitCondition((TwCondition)future, future->mtx, timeoutMs);
+		if (timedOut)
+			break;
+	}
+	int isDone = (future->cvValue & 2) != 0;
+	unsigned result = future->result;
+	unsigned error = future->error;
+	TW_UnlockMutex(future->mtx);
+	if (isDone && resultErrorPtr != (void*)0)
+		*resultErrorPtr = ((unsigned long long)error << 32) | (unsigned long long)result;
+	return isDone;
 }
 
-void TW_ReachFuture(TwFuture *future, void *value, int res) {
-	
+int TW_PeekFuture(TwFuture future, unsigned long long *resultErrorPtr) {
+	TW_LockMutex(future->mtx);
+	int isDone = (future->cvValue & 2) != 0;
+	unsigned result = future->result;
+	unsigned error = future->error;
+	TW_UnlockMutex(future->mtx);
+	if (isDone && resultErrorPtr != (void*)0)
+		*resultErrorPtr = ((unsigned long long)error << 32) | (unsigned long long)result;
+	return isDone;
+}
+
+void TW_ReachFuture(TwFuture future, unsigned result, unsigned error) {
+	TW_LockMutex(future->mtx);
+	future->result = result;
+	future->error = error;
+	TW_GetAndSetAtomic((unsigned*)future, 3); // broadcast condition and set done status
+	TW_UnlockMutex(future->mtx);
 }

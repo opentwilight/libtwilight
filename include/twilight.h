@@ -91,11 +91,15 @@ struct _tw_slab_bucket_256 {
 };
 typedef struct _tw_slab_bucket_256 TwSlabBucket256;
 
-typedef struct {
-	TwCondition cond;
+struct _tw_future_st {
+	unsigned cvValue;
 	TwMutex mtx;
-	void *value;
-} TwFuture;
+	unsigned result;
+	unsigned error;
+};
+typedef struct _tw_future_st* TwFuture;
+
+TwFuture TW_MakeFuture(unsigned initialResult, unsigned initialError);
 
 typedef struct {
 	long long totalSize;
@@ -151,7 +155,7 @@ typedef struct tw_filesystem TwFilesystem;
 
 // These must be defined in the architecture implementation, ie. ppc or arm
 extern void TW_Exit(void);
-extern int TW_CompareAndSwapAtomic(unsigned *address, unsigned expected, unsigned newValue);
+extern int TW_CompareAndSwapAtomic(unsigned *address, unsigned expectedMask, unsigned expectedValue, unsigned newValue);
 extern unsigned TW_GetAndSetAtomic(unsigned *address, unsigned newValue);
 extern unsigned TW_AddAtomic(unsigned *address, int delta);
 extern unsigned TW_OrAtomic(unsigned *address, unsigned value);
@@ -196,10 +200,11 @@ TwSlabBucket256 TW_CreateSlabBucket256(char *buffer);
 void *TW_AddSb256Item(TwSlabBucket256 *bucket);
 int TW_RemoveSb256Item(TwSlabBucket256 *bucket, void *item);
 
-void TW_AwaitFuture(TwFuture *future, int timeoutMs);
-void TW_CompleteFuture(TwFuture *future, void *value);
-void TW_FailFuture(TwFuture *future, int res);
-void TW_ReachFuture(TwFuture *future, void *value, int res);
+TwFuture TW_MakeFuture(unsigned initialResult, unsigned initialError);
+unsigned long long TW_AwaitFuture(TwFuture future);
+int TW_AwaitFutureForTheNext(TwFuture future, int timeoutMs, unsigned long long *resultErrorPtr);
+int TW_PeekFuture(TwFuture future, unsigned long long *resultErrorPtr);
+void TW_ReachFuture(TwFuture future, unsigned value, unsigned error);
 
 // strformat.c
 int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...);
@@ -217,7 +222,7 @@ void TW_LockMutex(TwMutex mtx);
 void TW_UnlockMutex(TwMutex mtx);
 void TW_DestroyMutex(TwMutex mutex);
 TwCondition TW_CreateCondition(void);
-void TW_AwaitCondition(TwCondition cv, TwMutex mutex, int timeoutMs);
+int TW_AwaitCondition(TwCondition cv, TwMutex mutex, int timeoutMs);
 void TW_BroadcastCondition(TwCondition cv, TwMutex mutex);
 void TW_DestroyCondition(TwCondition cv);
 

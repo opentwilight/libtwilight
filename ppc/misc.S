@@ -36,26 +36,28 @@ TW_DisableInterrupts:
 	isync
 	blr
 
-.globl TW_CompareAndSwapAtomic // bool TW_CompareAndSwapAtomic(unsigned *address, unsigned expected, unsigned newValue)
+.globl TW_CompareAndSwapAtomic // bool TW_CompareAndSwapAtomic(unsigned *address, unsigned expectedMask, unsigned expectedValue, unsigned newValue)
 TW_CompareAndSwapAtomic:
 	sync
 	isync
 	// reserve the 32 byte cache block, so that we know if we were interrupted before we could complete the swap
-	lwarx 6, 0, 3
-	// select newValue if r6 == expected, else keep the old value
-	sub 7, 6, 4             // get the difference between the loaded value and the expected value
-	neg 8, 7                // negate and OR ensures the top bit of is set if and only if there is a difference
-	or 7, 7, 8
-	rlwinm 7, 7, 1, 31, 31  // shift right by 31, so we have it in the least significant bit
-	neg 8, 7                // set r8 to all ones if there is a difference, all zeros if not
-	addic 7, 7, -1          // set r7 to all ones if there is NO difference, all zeros if so
-	addi 9, 8, 1            // keep whether it was equal or not in r9 by adding 1 to the not-equal mask
-	and 7, 7, 5             // valueToSet = (newValue & matchedExpected) | (oldValue & didNotMatchExpected)
-	and 8, 8, 6
-	or 6, 8, 7
-	stwcx. 6, 0, 3          // attempt to store if the earlier reservation still exists
+	lwarx 7, 0, 3
+	// select newValue if r7 == expected, else keep the old value
+	and 7, 7, 4             // bitwise AND the loaded value with the expected mask
+	and 8, 5, 4             // bitwise AND the expected value with the expected mask
+	sub 8, 7, 8             // get the difference between the two
+	neg 9, 8                // negate and OR ensures the top bit of is set if and only if there is a difference
+	or 8, 8, 9
+	rlwinm 8, 8, 1, 31, 31  // shift right by 31, so we have it in the least significant bit
+	neg 9, 8                // set r9 to all ones if there is a difference, all zeros if not
+	addi 10, 9, 1           // keep whether it was equal or not in r10 by adding 1 to the not-equal mask
+	addic 8, 8, -1          // set r8 to all ones if there is NO difference, all zeros if so
+	and 8, 8, 6             // valueToSet = (newValue & matchedExpected) | (oldValue & didNotMatchExpected)
+	and 9, 9, 7
+	or 7, 9, 8
+	stwcx. 7, 0, 3          // attempt to store if the earlier reservation still exists
 	bne TW_CompareAndSwapAtomic
-	mr 3, 9                 // we kept whether the old value matched the expected in r9, so copy it to the return register
+	mr 3, 10                 // we kept whether the old value matched the expected in r10, so copy it to the return register
 	blr
 
 .globl TW_GetAndSetAtomic // unsigned TW_GetAndSetAtomic(unsigned *address, unsigned newValue)
