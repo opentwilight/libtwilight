@@ -15,9 +15,9 @@ static void _tw_sdcard_write(struct tw_file *file, void *userData, void *data, i
 	completionHandler(file, userData, TW_FILE_METHOD_WRITE, res);
 }
 
-static void _tw_sdcard_seek(struct tw_file *file, void *userData, long long seekAmount, int whence, TwIoCompletion64 completionHandler) {
+static void _tw_sdcard_seek(struct tw_file *file, void *userData, long long seekAmount, int whence, TwIoCompletion completionHandler) {
 	int res = 0;
-	completionHandler(file, userData, TW_FILE_METHOD_SEEK, (long long)res);
+	completionHandler(file, userData, TW_FILE_METHOD_SEEK, res);
 }
 
 static void _tw_sdcard_ioctl(struct tw_file *file, void *userData, unsigned method, void *input, int inputSize, void *output, int outputSize, TwIoCompletion completionHandler) {

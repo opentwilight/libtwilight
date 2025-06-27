@@ -226,6 +226,7 @@ void TW_InitExiInterrupts(void);
 int TW_LaunchWiiTitle(unsigned long long titleId);
 
 // ios.c
+void TW_InvokeMatchingIosCompletionHandler(unsigned *iob);
 int TW_IoctlvRebootIos(int fd, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs);
 TwFilesystem TW_MakeIosFilesystem(void);
 

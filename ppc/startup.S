@@ -236,6 +236,10 @@ _copy_irq_handler:
 	lis 4, 0xcd00
 	li 3, 6
 	stw 3, 4(4)
+	li 3, 46 // TW_INTERRUPT_BIT_IPC_BROADWAY
+	lis 4, TW_HandleIosInterrupt@ha
+	addi 4, 4, TW_HandleIosInterrupt@l
+	bl TW_SetExternalInterruptHandler
 #endif
 	sync
 

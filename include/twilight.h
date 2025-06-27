@@ -119,8 +119,14 @@ struct tw_filesystem;
 
 struct tw_file;
 
-typedef void (*TwIoCompletion)(struct tw_file *file, void *userData, int method, int result);
-typedef void (*TwIoCompletion64)(struct tw_file *file, void *userData, int method, long long result);
+typedef void (*TwIoCompletion)(struct tw_file *file, void *userData, int method, long long result);
+
+typedef struct {
+	TwIoCompletion handler;
+	struct tw_file *file;
+	void *userData;
+	int method;
+} TwIoCompletionContext;
 
 struct tw_file {
 	struct tw_filesystem *fs;
@@ -131,7 +137,7 @@ struct tw_file {
 	TwFileProperties (*getProperties)(struct tw_file *file);
 	void (*read)(struct tw_file *file, void *userData, void *data, int size, TwIoCompletion completionHandler);
 	void (*write)(struct tw_file *file, void *userData, void *data, int size, TwIoCompletion completionHandler);
-	void (*seek)(struct tw_file *file, void *userData, long long seekAmount, int whence, TwIoCompletion64 completionHandler);
+	void (*seek)(struct tw_file *file, void *userData, long long seekAmount, int whence, TwIoCompletion completionHandler);
 	void (*ioctl)(struct tw_file *file, void *userData, unsigned method, void *input, int inputSize, void *output, int outputSize, TwIoCompletion completionHandler);
 	void (*ioctlv)(struct tw_file *file, void *userData, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs, TwIoCompletion completionHandler);
 	void (*flush)(struct tw_file *file, void *userData, TwIoCompletion completionHandler);

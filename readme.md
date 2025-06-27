@@ -45,6 +45,7 @@ Install LLVM and Clang.
 	- Timeouts in `TW_AwaitCondition`
 	- Maybe schedule other threads in `TW_LockMutex` and `TW_AwaitCondition`
 	- Check for deadlock if waiting in `TW_LockMutex` and `TW_AwaitCondition`
+	- If `TW_LockMutex` or `TW_AwaitCondition` is run while in an interrupt, rfi immediately
 - Build Tools
 	- ELF to DOL
 	- FST generator

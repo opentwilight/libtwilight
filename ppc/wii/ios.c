@@ -1,8 +1,9 @@
 #include <twilight_ppc.h>
 
-#define ALIGNED_IOS_BUFFER (unsigned*)((((unsigned)&_ios_buffer[0]) + 0x3f) & ~0x3f)
+#define ALIGNED_IOS_BUFFER(idx) (unsigned*)((((unsigned)&_ios_buffers[0]) + ((idx)*0x40) + 0x3f) & ~0x3f)
 
-extern int TW_PumpIos(unsigned *iosBufAligned64Bytes, int shouldReboot);
+extern int TW_RebootIosSync(unsigned *iosBufAligned64Bytes);
+extern void TW_SubmitIosRequest(unsigned *iosBufAligned64Bytes);
 
 static const char *_default_ios_devices[] = {
 	"/dev/aes",
@@ -51,7 +52,12 @@ static const char *_default_ios_devices[] = {
 	"/dev/wl0",
 };
 
-static unsigned _ios_buffer[1032];
+static unsigned _ios_buffers[528];
+
+static TwIoCompletionContext _ios_completion_handlers[32];
+
+static char padding[32];
+static unsigned _ios_completion_write_head = 0;
 
 int TW_ListIosFolder(unsigned flags, const char *path, int pathLen, TwStream *output) {
 	if (!path || pathLen <= 0)
@@ -61,64 +67,17 @@ int TW_ListIosFolder(unsigned flags, const char *path, int pathLen, TwStream *ou
 	return TW_WriteMatchingPaths(_default_ios_devices, nDevices, path, pathLen, output);
 }
 
-#define RUN_TWO_ARG_IOS_METHOD(cmd_type, arg0, arg1) \
-{ \
-	unsigned *iob = ALIGNED_IOS_BUFFER; \
-	iob[0] = cmd_type; \
-	iob[1] = 0; \
-	iob[2] = fd; \
-	iob[3] = (unsigned)arg0; \
-	iob[4] = (unsigned)arg1; \
-	TW_PumpIos(iob, 0); \
-	result = (int)iob[1]; \
+void TW_InvokeMatchingIosCompletionHandler(unsigned *iob) {
+	unsigned *base_iob = ALIGNED_IOS_BUFFER(0);
+	int idx = (iob - base_iob) >> 6;
+	TwIoCompletionContext *ch = &_ios_completion_handlers[idx];
+	if (idx >= 0 && idx < 32 && ch->handler)
+		ch->handler(ch->file, ch->userData, ch->method, iob[1]);
 }
 
-int TW_ReadAlignedIos(int fd, void *data, int size) {
-	int result;
-	void *physPtr = GET_PHYSICAL_POINTER(data);
-	RUN_TWO_ARG_IOS_METHOD(TW_IOS_CMD_READ, physPtr, size)
-	TW_SyncBeforeRead(data, size);
-	return result;
-}
-
-int TW_WriteAlignedIos(int fd, void *data, int size) {
-	int result;
-	TW_SyncAfterWrite(data, size);
-	void *physPtr = GET_PHYSICAL_POINTER(data);
-	RUN_TWO_ARG_IOS_METHOD(TW_IOS_CMD_WRITE, physPtr, size)
-	return result;
-}
-
-int TW_SeekIos(int fd, int offset, int whence) {
-	int result;
-	RUN_TWO_ARG_IOS_METHOD(TW_IOS_CMD_SEEK, offset, whence)
-	return result;
-}
-
-int TW_IoctlIos(int fd, unsigned method, void *input, int inputSize, void *output, int outputSize) {
-	unsigned *iob = ALIGNED_IOS_BUFFER;
-	iob[0] = TW_IOS_CMD_IOCTL;
-	iob[1] = 0;
-	iob[2] = fd;
-	iob[3] = method;
-	iob[4] = (unsigned)GET_PHYSICAL_POINTER(input);
-	iob[5] = (unsigned)inputSize;
-	iob[6] = (unsigned)GET_PHYSICAL_POINTER(output);
-	iob[7] = (unsigned)outputSize;
-
-	if (input && inputSize > 0)
-		TW_SyncAfterWrite(input, inputSize);
-
-	TW_PumpIos(iob, 0);
-
-	if (output && outputSize > 0)
-		TW_SyncBeforeRead(output, outputSize);
-
-	return (int)iob[1];
-}
-
-int TW_IoctlvIos(int fd, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs, int shouldReboot) {
-	unsigned *iob = ALIGNED_IOS_BUFFER;
+int TW_IoctlvRebootIos(int fd, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs) {
+	unsigned ios_buffer_idx = TW_AddAtomic(&_ios_completion_write_head, 1) & 0x1f;
+	unsigned *iob = ALIGNED_IOS_BUFFER(ios_buffer_idx);
 	iob[0] = TW_IOS_CMD_IOCTLV;
 	iob[1] = 0;
 	iob[2] = fd;
@@ -133,26 +92,13 @@ int TW_IoctlvIos(int fd, unsigned method, int nInputs, int nOutputs, TwView *inp
 		inputsAndOutputs[i].data = GET_PHYSICAL_POINTER(inputsAndOutputs[i].data);
 	}
 
-	TW_PumpIos(iob, shouldReboot);
+	TW_RebootIosSync(iob);
 
 	for (int i = nInputs; i < nInputs + nOutputs; i++) {
 		if (inputsAndOutputs[i].data && inputsAndOutputs[i].size > 0)
 			TW_SyncBeforeRead((void*)(0x80000000 | (unsigned)inputsAndOutputs[i].data), inputsAndOutputs[i].size);
 	}
 
-	return (int)iob[1];
-}
-
-int TW_IoctlvRebootIos(int fd, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs) {
-	return TW_IoctlvIos(fd, method, nInputs, nOutputs, inputsAndOutputs, 1);
-}
-
-int TW_CloseIos(int fd) {
-	unsigned *iob = ALIGNED_IOS_BUFFER;
-	iob[0] = TW_IOS_CMD_CLOSE;
-	iob[1] = 0;
-	iob[2] = fd;
-	TW_PumpIos(iob, 0);
 	return (int)iob[1];
 }
 
@@ -163,35 +109,121 @@ TwFileProperties _get_ios_file_properties(struct tw_file *file) {
 	return props;
 }
 
+#define RUN_TWO_ARG_IOS_METHOD(idx, fd, cmd_type, arg0, arg1) \
+{ \
+	unsigned *iob = ALIGNED_IOS_BUFFER(idx); \
+	iob[0] = cmd_type; \
+	iob[1] = 0; \
+	iob[2] = fd; \
+	iob[3] = (unsigned)arg0; \
+	iob[4] = (unsigned)arg1; \
+	TW_SubmitIosRequest(iob); \
+}
+
 void _read_ios_file(struct tw_file *file, void *userData, void *data, int size, TwIoCompletion completionHandler) {
-	int res = TW_ReadAlignedIos((int)file->params[0], data, size);
-	completionHandler(file, userData, TW_FILE_METHOD_READ, res);
+	unsigned ios_buffer_idx = TW_AddAtomic(&_ios_completion_write_head, 1) & 0x1f;
+	TwIoCompletionContext *ch = &_ios_completion_handlers[ios_buffer_idx];
+	ch->handler = completionHandler;
+	ch->file = file;
+	ch->userData = userData;
+	ch->method = TW_FILE_METHOD_READ;
+
+	void *physPtr = GET_PHYSICAL_POINTER(data);
+	RUN_TWO_ARG_IOS_METHOD(ios_buffer_idx, file->params[0], TW_IOS_CMD_READ, physPtr, size)
 }
 
 void _write_ios_file(struct tw_file *file, void *userData, void *data, int size, TwIoCompletion completionHandler) {
-	int res = TW_WriteAlignedIos((int)file->params[0], data, size);
-	completionHandler(file, userData, TW_FILE_METHOD_WRITE, res);
+	unsigned ios_buffer_idx = TW_AddAtomic(&_ios_completion_write_head, 1) & 0x1f;
+	TwIoCompletionContext *ch = &_ios_completion_handlers[ios_buffer_idx];
+	ch->handler = completionHandler;
+	ch->file = file;
+	ch->userData = userData;
+	ch->method = TW_FILE_METHOD_WRITE;
+
+	TW_SyncAfterWrite(data, size);
+	void *physPtr = GET_PHYSICAL_POINTER(data);
+	RUN_TWO_ARG_IOS_METHOD(ios_buffer_idx, file->params[0], TW_IOS_CMD_WRITE, physPtr, size)
 }
 
-void _seek_ios_file(struct tw_file *file, void *userData, long long seekAmount, int whence, TwIoCompletion64 completionHandler) {
+void _seek_ios_file(struct tw_file *file, void *userData, long long seekAmount, int whence, TwIoCompletion completionHandler) {
+	unsigned ios_buffer_idx = TW_AddAtomic(&_ios_completion_write_head, 1) & 0x1f;
+	TwIoCompletionContext *ch = &_ios_completion_handlers[ios_buffer_idx];
+	ch->handler = completionHandler;
+	ch->file = file;
+	ch->userData = userData;
+	ch->method = TW_FILE_METHOD_SEEK;
+
 	int delta = (int)seekAmount;
-	int res = TW_SeekIos((int)file->params[0], whence, delta);
-	completionHandler(file, userData, TW_FILE_METHOD_SEEK, (long long)res);
+	RUN_TWO_ARG_IOS_METHOD(ios_buffer_idx, file->params[0], TW_IOS_CMD_SEEK, seekAmount, whence)
 }
 
 void _ioctl_ios_file(struct tw_file *file, void *userData, unsigned method, void *input, int inputSize, void *output, int outputSize, TwIoCompletion completionHandler) {
-	int res = TW_IoctlIos((int)file->params[0], method, input, inputSize, output, outputSize);
-	completionHandler(file, userData, TW_FILE_METHOD_IOCTL, res);
+	unsigned ios_buffer_idx = TW_AddAtomic(&_ios_completion_write_head, 1) & 0x1f;
+	TwIoCompletionContext *ch = &_ios_completion_handlers[ios_buffer_idx];
+	ch->handler = completionHandler;
+	ch->file = file;
+	ch->userData = userData;
+	ch->method = TW_FILE_METHOD_IOCTL;
+
+	unsigned *iob = ALIGNED_IOS_BUFFER(ios_buffer_idx);
+	iob[0] = TW_IOS_CMD_IOCTL;
+	iob[1] = 0;
+	iob[2] = file->params[0];
+	iob[3] = method;
+	iob[4] = (unsigned)GET_PHYSICAL_POINTER(input);
+	iob[5] = (unsigned)inputSize;
+	iob[6] = (unsigned)GET_PHYSICAL_POINTER(output);
+	iob[7] = (unsigned)outputSize;
+
+	if (input && inputSize > 0)
+		TW_SyncAfterWrite(input, inputSize);
+
+	TW_SubmitIosRequest(iob);
 }
 
 void _ioctlv_ios_file(struct tw_file *file, void *userData, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs, TwIoCompletion completionHandler) {
-	int res = TW_IoctlvIos((int)file->params[0], method, nInputs, nOutputs, inputsAndOutputs, 0);
-	completionHandler(file, userData, TW_FILE_METHOD_IOCTLV, res);
+	unsigned ios_buffer_idx = TW_AddAtomic(&_ios_completion_write_head, 1) & 0x1f;
+	TwIoCompletionContext *ch = &_ios_completion_handlers[ios_buffer_idx];
+	ch->handler = completionHandler;
+	ch->file = file;
+	ch->userData = userData;
+	ch->method = TW_FILE_METHOD_IOCTLV;
+
+	unsigned *iob = ALIGNED_IOS_BUFFER(ios_buffer_idx);
+	iob[0] = TW_IOS_CMD_IOCTLV;
+	iob[1] = 0;
+	iob[2] = file->params[0];
+	iob[3] = method;
+	iob[4] = (unsigned)nInputs;
+	iob[5] = (unsigned)nOutputs;
+	iob[6] = (unsigned)inputsAndOutputs;
+
+	for (int i = 0; i < nInputs + nOutputs; i++) {
+		if (i < nInputs && inputsAndOutputs[i].data && inputsAndOutputs[i].size > 0)
+			TW_SyncAfterWrite(inputsAndOutputs[i].data, inputsAndOutputs[i].size);
+		inputsAndOutputs[i].data = GET_PHYSICAL_POINTER(inputsAndOutputs[i].data);
+	}
+
+	TW_SubmitIosRequest(iob);
 }
 
 void _close_ios_file(struct tw_file *file, void *userData, TwIoCompletion completionHandler) {
-	int res = TW_CloseIos((int)file->params[0]);
-	completionHandler(file, userData, TW_FILE_METHOD_CLOSE, res);
+	unsigned ios_buffer_idx = TW_AddAtomic(&_ios_completion_write_head, 1) & 0x1f;
+	TwIoCompletionContext *ch = &_ios_completion_handlers[ios_buffer_idx];
+	ch->handler = completionHandler;
+	ch->file = file;
+	ch->userData = userData;
+	ch->method = TW_FILE_METHOD_CLOSE;
+
+	unsigned *iob = ALIGNED_IOS_BUFFER(ios_buffer_idx);
+	iob[0] = TW_IOS_CMD_CLOSE;
+	iob[1] = 0;
+	iob[2] = file->params[0];
+	TW_SubmitIosRequest(iob);
+}
+
+static void _tw_await_ios_open(struct tw_file *file, void *userData, int method, long long result) {
+	TW_ReachFuture((TwFuture)userData, result, 0);
 }
 
 TwFile TW_OpenIosDevice(unsigned flags, const char *path, int pathLen) {
@@ -207,10 +239,22 @@ TwFile TW_OpenIosDevice(unsigned flags, const char *path, int pathLen) {
 		ios_path[i] = path[i];
 	ios_path[pathLen] = 0;
 
+	TwFuture fd_future = TW_CreateFuture(0, 0);
+
+	unsigned ios_buffer_idx = TW_AddAtomic(&_ios_completion_write_head, 1) & 0x1f;
+	TwIoCompletionContext *ch = &_ios_completion_handlers[ios_buffer_idx];
+	ch->handler = _tw_await_ios_open;
+	ch->file = (void*)0;
+	ch->userData = fd_future;
+	ch->method = TW_FILE_METHOD_OPEN;
+
 	int mode = flags;
-	int fd = 0;
-	int result;
-	RUN_TWO_ARG_IOS_METHOD(TW_IOS_CMD_OPEN, path, mode)
+	RUN_TWO_ARG_IOS_METHOD(ios_buffer_idx, 0, TW_IOS_CMD_OPEN, path, mode)
+
+	long long result = TW_AwaitFuture(fd_future);
+	TW_DestroyFuture(fd_future);
+
+	int fd = (int)(result & 0xFFFFffffLL);
 	if (fd <= 0)
 		return file;
 

@@ -15,7 +15,7 @@ static void _defaultRead(TwFile *file, void *userData, void *buf, int size, TwIo
 static void _defaultWrite(TwFile *file, void *userData, void *buf, int size, TwIoCompletion completionHandler) {
 	completionHandler(file, userData, TW_FILE_METHOD_WRITE, 0);
 }
-static void _defaultSeek(TwFile *file, void *userData, long long seekAmount, int whence, TwIoCompletion64 completionHandler) {
+static void _defaultSeek(TwFile *file, void *userData, long long seekAmount, int whence, TwIoCompletion completionHandler) {
 	completionHandler(file, userData, TW_FILE_METHOD_SEEK, 0);
 }
 static void _defaultFlush(TwFile *file, void *userData, TwIoCompletion completionHandler) {
@@ -104,12 +104,7 @@ int TW_AddFile(TwFile file, TwFile **fileOut) {
 	return -1;
 }
 
-static void _tw_sync_io_completion_handler(struct tw_file *file, void *userData, int method, int result) {
-	TwFuture f = (TwFuture)userData;
-	TW_ReachFuture(f, (unsigned)(result & 0xFFFFffffLL), 0);
-}
-
-static void _tw_sync_io_completion_handler_64(struct tw_file *file, void *userData, int method, long long result) {
+static void _tw_sync_io_completion_handler(struct tw_file *file, void *userData, int method, long long result) {
 	TwFuture f = (TwFuture)userData;
 	TW_ReachFuture(f, (unsigned)(result & 0xFFFFffffLL), (unsigned)((result >> 32) & 0xFFFFffffLL));
 }
@@ -132,7 +127,7 @@ int TW_WriteFileSync(TwFile *file, void *data, int size) {
 
 long long TW_SeekFileSync(TwFile *file, long long seekAmount, int whence) {
 	TwFuture f = TW_CreateFuture(0, 0);
-	file->seek(file, f, seekAmount, whence, _tw_sync_io_completion_handler_64);
+	file->seek(file, f, seekAmount, whence, _tw_sync_io_completion_handler);
 	unsigned long long resultError = TW_AwaitFuture(f);
 	TW_DestroyFuture(f);
 	return (long long)resultError;
