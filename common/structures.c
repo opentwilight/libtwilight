@@ -391,10 +391,10 @@ unsigned long long TW_AwaitFuture(TwFuture future) {
 	return ((unsigned long long)error << 32) | (unsigned long long)result;
 }
 
-int TW_AwaitFutureForTheNext(TwFuture future, int timeoutMs, unsigned long long *resultErrorPtr) {
+int TW_AwaitFutureForTheNext(TwFuture future, int timeoutUs, unsigned long long *resultErrorPtr) {
 	TW_LockMutex(future->mtx);
 	while ((future->cvValue & 2) == 0) {
-		int timedOut = TW_AwaitCondition((TwCondition)future, future->mtx, timeoutMs);
+		int timedOut = TW_AwaitCondition((TwCondition)future, future->mtx, timeoutUs);
 		if (timedOut)
 			break;
 	}
@@ -402,6 +402,7 @@ int TW_AwaitFutureForTheNext(TwFuture future, int timeoutMs, unsigned long long 
 	unsigned result = future->result;
 	unsigned error = future->error;
 	TW_UnlockMutex(future->mtx);
+
 	if (isDone && resultErrorPtr != (void*)0)
 		*resultErrorPtr = ((unsigned long long)error << 32) | (unsigned long long)result;
 	return isDone;
@@ -428,4 +429,84 @@ void TW_ReachFuture(TwFuture future, unsigned result, unsigned error) {
 
 void TW_DestroyFuture(TwFuture future) { // O_o
 	TW_DestroyCondition((TwCondition)future);
-};
+}
+
+TwQueue TW_CreateQueue(void *buf, int capacity) {
+	TwMutex mtx = TW_CreateMutex();
+	TwCondition cv = TW_CreateCondition();
+	TwQueue q = (TwQueue)cv;
+	q->cvValue = 0;
+	q->mtx = mtx;
+	q->data = (char*)buf;
+	q->capacity = capacity;
+	q->readPos = 0;
+	q->writePos = 0;
+	return q;
+}
+
+int TW_PushToQueue(TwQueue q, void *obj, int size, int timeoutUs) {
+	if (size > q->capacity)
+		return 0;
+
+	TW_LockMutex(q->mtx);
+
+	int spaceLeft = 0;
+	while ((spaceLeft = ((q->readPos - q->writePos + q->capacity) % q->capacity)) < size) {
+		int timedOut = TW_AwaitCondition((TwCondition)q, q->mtx, timeoutUs);
+		if (timedOut) {
+			TW_UnlockMutex(q->mtx);
+			return 0;
+		}
+	}
+
+	int oldPos = q->writePos;
+	q->writePos = (q->writePos + size) % q->capacity;
+
+	int after = oldPos + size - q->capacity;
+	if (after > 0) {
+		TW_CopyBytes(&q->data[oldPos], obj, size - after);
+		TW_CopyBytes(q->data, &((char*)obj)[size - after], after);
+	}
+	else {
+		TW_CopyBytes(&q->data[oldPos], obj, size);
+	}
+
+	TW_UnlockMutex(q->mtx);
+
+	return size;
+}
+
+int TW_PullFromQueue(TwQueue q, void *obj, int size, int timeoutUs) {
+	int toRead = size < q->capacity ? size : q->capacity;
+
+	TW_LockMutex(q->mtx);
+
+	int available = 0;
+	while ((available = ((q->writePos - q->readPos + q->capacity) % q->capacity)) < toRead) {
+		int timedOut = TW_AwaitCondition((TwCondition)q, q->mtx, timeoutUs);
+		if (timedOut) {
+			TW_UnlockMutex(q->mtx);
+			return 0;
+		}
+	}
+
+	int oldPos = q->readPos;
+	q->readPos = (q->readPos + toRead) % q->capacity;
+
+	int after = oldPos + toRead - q->capacity;
+	if (after > 0) {
+		TW_CopyBytes(obj, &q->data[oldPos], toRead - after);
+		TW_CopyBytes(&((char*)obj)[toRead - after], q->data, after);
+	}
+	else {
+		TW_CopyBytes(obj, &q->data[oldPos], toRead);
+	}
+
+	TW_UnlockMutex(q->mtx);
+
+	return toRead;
+}
+
+void TW_DestroyQueue(TwQueue q) {
+	TW_DestroyCondition((TwCondition)q);
+}

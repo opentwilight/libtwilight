@@ -111,6 +111,16 @@ typedef struct _tw_future_st* TwFuture;
 
 TwFuture TW_MakeFuture(unsigned initialResult, unsigned initialError);
 
+struct _tw_queue_st {
+	unsigned cvValue;
+	TwMutex mtx;
+	char *data;
+	int capacity;
+	int readPos;
+	int writePos;
+};
+typedef struct _tw_queue_st* TwQueue;
+
 typedef struct {
 	long long totalSize;
 } TwFileProperties;
@@ -127,6 +137,36 @@ typedef struct {
 	void *userData;
 	int method;
 } TwIoCompletionContext;
+
+typedef struct {
+	struct tw_file *file;
+	int method;
+	unsigned result;
+	unsigned error;
+	union {
+		struct {
+			void *data;
+			int size;
+		} readWrite;
+		struct {
+			long long seekAmount;
+			int whence;
+		} seek;
+		struct {
+			unsigned method;
+			void *input;
+			int inputSize;
+			void *output;
+			int outputSize;
+		} ioctl;
+		struct {
+			unsigned method;
+			int nInputs;
+			int nOutputs;
+			TwView *inputsAndOutputs;
+		} ioctlv;
+	};
+} TwFileTransaction;
 
 struct tw_file {
 	struct tw_filesystem *fs;
@@ -218,10 +258,15 @@ int TW_RemoveSb256Item(TwSlabBucket256 *bucket, void *item);
 
 TwFuture TW_CreateFuture(unsigned initialResult, unsigned initialError);
 unsigned long long TW_AwaitFuture(TwFuture future);
-int TW_AwaitFutureForTheNext(TwFuture future, int timeoutMs, unsigned long long *resultErrorPtr);
+int TW_AwaitFutureForTheNext(TwFuture future, int timeoutUs, unsigned long long *resultErrorPtr);
 int TW_PeekFuture(TwFuture future, unsigned long long *resultErrorPtr);
 void TW_ReachFuture(TwFuture future, unsigned value, unsigned error);
 void TW_DestroyFuture(TwFuture future); // o_O
+
+TwQueue TW_CreateQueue(void *buf, int capacity);
+int TW_PushToQueue(TwQueue q, void *obj, int size, int timeoutUs);
+int TW_PullFromQueue(TwQueue q, void *obj, int size, int timeoutUs);
+void TW_DestroyQueue(TwQueue q);
 
 // strformat.c
 int TW_FormatString(TwStream *sink, int maxOutputSize, const char *str, ...);
@@ -239,7 +284,7 @@ void TW_LockMutex(TwMutex mtx);
 void TW_UnlockMutex(TwMutex mtx);
 void TW_DestroyMutex(TwMutex mutex);
 TwCondition TW_CreateCondition(void);
-int TW_AwaitCondition(TwCondition cv, TwMutex mutex, int timeoutMs);
+int TW_AwaitCondition(TwCondition cv, TwMutex mutex, int timeoutUs);
 void TW_BroadcastCondition(TwCondition cv, TwMutex mutex);
 void TW_DestroyCondition(TwCondition cv);
 

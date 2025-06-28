@@ -95,7 +95,7 @@ TwCondition TW_CreateCondition(void) {
 	return ptr;
 }
 
-int TW_AwaitCondition(TwCondition cv, TwMutex mutex, int timeoutMs) {
+int TW_AwaitCondition(TwCondition cv, TwMutex mutex, int timeoutUs) {
 	TW_UnlockMutex(mutex);
 	TW_GetAndSetAtomic((unsigned*)cv, 1);
 	TW_EnableInterrupts();
