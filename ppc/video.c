@@ -162,15 +162,11 @@ void TW_InvalidateVideoTiming() {
 }
 
 void TW_AwaitVideoVBlank(TwVideo *params) {
-	if (TW_MultiThreadingEnabled()) {
-		// try to yield if multithreading, and get woken up by the interrupt
-		// TODO
-	}
-	else {
-		// spin
-		unsigned cur_frame = _frame_counter;
-		while (PEEK_U32(&_frame_counter) == cur_frame)
-			PPC_SYNC();
+	PPC_SYNC();
+	unsigned cur_frame = _frame_counter;
+	while (PEEK_U32(&_frame_counter) == cur_frame) {
+		TW_Sleep(20000);
+		PPC_SYNC();
 	}
 }
 

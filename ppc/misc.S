@@ -36,6 +36,12 @@ TW_DisableInterrupts:
 	isync
 	blr
 
+.globl TW_GetCpuTimeBase // unsigned long long TW_GetCpuTimeBase(void)
+TW_GetCpuTimeBase:
+	mftbu 3
+	mftbl 4
+	blr
+
 .globl TW_CompareAndSwapAtomic // bool TW_CompareAndSwapAtomic(unsigned *address, unsigned expectedMask, unsigned expectedValue, unsigned newValue)
 TW_CompareAndSwapAtomic:
 	sync

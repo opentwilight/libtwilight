@@ -2,6 +2,15 @@
 
 static int _tw_thread_count = 0;
 static int _tw_next_id = 0;
+static int _tw_cur_thread = 0;
+static int _tw_highest_schedule = 0;
+
+struct _tw_schedule {
+	unsigned timeReadyHigh;
+	unsigned timeReadyLow;
+	int threadId;
+};
+static struct _tw_thread_schedule_list[1024] = {0};
 
 struct _tw_thread {
 	unsigned flags;
@@ -12,7 +21,7 @@ struct _tw_thread {
 	unsigned padding;
 	// more info about the current thread
 };
-struct _tw_thread _tw_threads[TW_PPC_MAX_THREADS];
+static struct _tw_thread _tw_threads[TW_PPC_MAX_THREADS] = {0};
 
 // 32+1 256-bit (or 32 byte) blocks. +1 to account for padding.
 char _tw_first_threading_prims_buf[1056];
@@ -22,8 +31,8 @@ void TW_SetupThreading(void) {
 	_tw_threading_primitives = TW_CreateSlabBucket256(_tw_first_threading_prims_buf);
 }
 
-int TW_MultiThreadingEnabled(void) {
-	return 0;
+int TW_GetThreadCount(void) {
+	return 1;
 }
 
 int TW_StartThread(void *userData, void *(*entry)(void*)) {
@@ -54,6 +63,57 @@ int TW_StartThread(void *userData, void *(*entry)(void*)) {
 
 	TW_EnableInterrupts();
 	return 0;
+}
+
+int TW_ScheduleTask(int threadId, int durationUs) {
+	if (durationUs <= 0) {
+		TW_SwitchContext(threadId);
+		return 0;
+	}
+
+	unsigned long long deltaTime = 243ull * (unsigned long long)durationUs;
+	if (deltaTime <= (1ull << 31)) {
+		return -1;
+	}
+
+	unsigned long long currentTime = TW_GetCpuTimeBase();
+	unsigned long long readyTime = currentTime + deltaTime;
+
+	// TODO: Use a binary heap instead -- should speed up finding the nearest schedule item from O(n) to O(1)
+
+	int slot = -1;
+	int shouldSchedule = 0;
+	for (int i = 0; i < _tw_highest_schedule && (slot < 0 || !shouldSchedule); i++) {
+		struct _tw_schedule *s = &_tw_thread_schedule_list[i];
+		if (s->threadId < 0) {
+			slot = i;
+			continue;
+		}
+		if (!shouldSchedule) {
+			if (readyTime < (((unsigned long long)s->timeReadyHigh << 32) |
+				((unsigned long long)s->timeReadyLow & 0xffffFFFFull))
+			) {
+				shouldSchedule = 1;
+			}
+		}
+	}
+	if (slot < 0)
+		slot = _tw_highest_schedule & 0x3ff;
+
+	struct _tw_schedule *s = &_tw_thread_schedule_list[i];
+	s->threadId = threadId;
+	s->timeReadyHigh = (unsigned)(readyTime >> 32);
+	s->timeReadyLow = (unsigned)(readyTime & 0xffffFFFFull);
+
+	if (shouldSchedule) {
+		TW_SetTimerInterrupt(_tw_dispatch_thread, deltaTime);
+	}
+
+	return 0;
+}
+
+int TW_Sleep(int durationUs) {
+	
 }
 
 TwMutex TW_CreateMutex(void) {

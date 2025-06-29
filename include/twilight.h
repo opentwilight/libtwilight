@@ -211,6 +211,7 @@ typedef struct tw_filesystem TwFilesystem;
 
 // These must be defined in the architecture implementation, ie. ppc or arm
 extern void TW_Exit(void);
+extern unsigned long long TW_GetCpuTimeBase(void);
 extern int TW_CompareAndSwapAtomic(unsigned *address, unsigned expectedMask, unsigned expectedValue, unsigned newValue);
 extern unsigned TW_GetAndSetAtomic(unsigned *address, unsigned newValue);
 extern unsigned TW_AddAtomic(unsigned *address, int delta);
@@ -277,7 +278,7 @@ int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int m
 // threading
 // TODO: General thread pool
 void TW_SetupThreading(void);
-int TW_MultiThreadingEnabled(void);
+int TW_GetThreadCount(void);
 int TW_StartThread(void *userData, void *(*entry)(void*));
 TwMutex TW_CreateMutex(void);
 void TW_LockMutex(TwMutex mtx);
