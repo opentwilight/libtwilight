@@ -1,3 +1,102 @@
+.globl TW_LoadFprs // void TW_LoadFprs(double *buf)
+TW_LoadFprs:
+	lfd 0, 0(3)
+	lfd 1, 8(3)
+	lfd 2, 0x10(3)
+	lfd 3, 0x18(3)
+	lfd 4, 0x20(3)
+	lfd 5, 0x28(3)
+	lfd 6, 0x30(3)
+	lfd 7, 0x38(3)
+	lfd 8, 0x40(3)
+	lfd 9, 0x48(3)
+	lfd 10, 0x50(3)
+	lfd 11, 0x58(3)
+	lfd 12, 0x60(3)
+	lfd 13, 0x68(3)
+	lfd 14, 0x70(3)
+	lfd 15, 0x78(3)
+	lfd 16, 0x80(3)
+	lfd 17, 0x88(3)
+	lfd 18, 0x90(3)
+	lfd 19, 0x98(3)
+	lfd 20, 0xa0(3)
+	lfd 21, 0xa8(3)
+	lfd 22, 0xb0(3)
+	lfd 23, 0xb8(3)
+	lfd 24, 0xc0(3)
+	lfd 25, 0xc8(3)
+	lfd 26, 0xd0(3)
+	lfd 27, 0xd8(3)
+	lfd 28, 0xe0(3)
+	lfd 29, 0xe8(3)
+	lfd 30, 0xf0(3)
+	lfd 31, 0xf8(3)
+	blr
+
+.globl TW_SaveFprs // void TW_SaveFprs(double *buf)
+TW_SaveFprs:
+	stfd 0, 0(3)
+	stfd 1, 8(3)
+	stfd 2, 0x10(3)
+	stfd 3, 0x18(3)
+	stfd 4, 0x20(3)
+	stfd 5, 0x28(3)
+	stfd 6, 0x30(3)
+	stfd 7, 0x38(3)
+	stfd 8, 0x40(3)
+	stfd 9, 0x48(3)
+	stfd 10, 0x50(3)
+	stfd 11, 0x58(3)
+	stfd 12, 0x60(3)
+	stfd 13, 0x68(3)
+	stfd 14, 0x70(3)
+	stfd 15, 0x78(3)
+	stfd 16, 0x80(3)
+	stfd 17, 0x88(3)
+	stfd 18, 0x90(3)
+	stfd 19, 0x98(3)
+	stfd 20, 0xa0(3)
+	stfd 21, 0xa8(3)
+	stfd 22, 0xb0(3)
+	stfd 23, 0xb8(3)
+	stfd 24, 0xc0(3)
+	stfd 25, 0xc8(3)
+	stfd 26, 0xd0(3)
+	stfd 27, 0xd8(3)
+	stfd 28, 0xe0(3)
+	stfd 29, 0xe8(3)
+	stfd 30, 0xf0(3)
+	stfd 31, 0xf8(3)
+	blr
+
+.globl TW_SwitchContext // void TW_SwitchContext(TW_PpcCpuContext *fromCtx, TW_PpcCpuContext *toCtx)
+TW_SwitchContext:
+	stmw 0, 0(3)
+
+	mflr 27
+	mfxer 28
+	mfctr 29
+	mfcr 30
+	mffpscr 31
+	stmw 27, 0x180(3)
+
+	addi 3, 3, 0x80
+	bl TW_SaveFprs
+
+	addi 3, 4, 0x80
+	bl TW_LoadFprs
+
+	mtlr 27
+	mtxer 28
+	mtctr 29
+	mtcr 30
+	mtfpscr 31
+	lmw 27, 0x180(4)
+
+	lmw 0, 0(4)
+	blr
+
 .globl TW_GetStoredRegistersAddress
 TW_GetStoredRegistersAddress:
 	bl TW_GetInterruptStackStart
@@ -35,26 +134,18 @@ _tw_interrupt_handler_impl:
 	lwz 5, 4(4)   // r5 got clobbered earlier, so restore it here before saving
 	stmw 5, 20(1)
 
-	lwz 17, 8(4)  // LR
-	lwz 18, 12(4) // SRR0
-	lwz 19, 16(4) // SRR1
+	lwz 25, 8(4)  // SRR0
+	lwz 26, 12(4) // SRR1
+	lwz 27, 16(4) // LR
 
 	lwz 4, 0(4)
 	stw 4, 12(1) // r3
 
-	mfxer 20
-	mfctr 21
-	mfcr 22
-	mfdar 23
-	mfspr 24, 912
-	mfspr 25, 913
-	mfspr 26, 914
-	mfspr 27, 915
-	mfspr 28, 916
-	mfspr 29, 917
-	mfspr 30, 918
-	mfspr 31, 919
-	stmw 17, 132(1)
+	mfxer 28
+	mfctr 29
+	mfcr 30
+	mffpscr 31
+	stmw 25, 132(1)
 
 	// For some reason, the stack gets accessed out of bounds by _tw_dispatch_interrupt() when compiled with Clang.
 	// Usually this sort of thing is not too concerning, but since this OoB access is a write that overwrites the saved stack pointer,
@@ -63,19 +154,11 @@ _tw_interrupt_handler_impl:
 	bl _tw_dispatch_interrupt
 	addi 1, 1, 32
 
-	lmw 17, 132(1)
-	mtxer 20
-	mtctr 21
-	mtcr 22
-	mtdar 23
-	mtspr 912, 24
-	mtspr 913, 25
-	mtspr 914, 26
-	mtspr 915, 27
-	mtspr 916, 28
-	mtspr 917, 29
-	mtspr 918, 30
-	mtspr 919, 31
+	lmw 25, 132(1)
+	mtxer 28
+	mtctr 29
+	mtcr 30
+	mtfpscr 31
 
 	lwz 0, 0(1)
 	lwz 2, 8(1)
@@ -86,11 +169,11 @@ _tw_interrupt_handler_impl:
 	addi 4, 4, __tw_interrupt_call_scratch@l
 
 	lwz 3, 8(4)
-	mtlr 3
-	lwz 3, 12(4)
 	mtsrr0 3
-	lwz 3, 16(4)
+	lwz 3, 12(4)
 	mtsrr1 3
+	lwz 3, 16(4)
+	mtlr 3
 	lwz 3, 0(4)
 
 	mfspr 4, 272 // Restore r4 register from SPRG0, a backup register that we placed the original contents of r4 in
@@ -115,11 +198,11 @@ _tw_interrupt_handler_template:
 	stwcx. 3, 0, 4
 	stw 3, 0(4)
 	stw 5, 4(4)
-	mflr 3
-	stw 3, 8(4)
 	mfsrr0 3
-	stw 3, 12(4)
+	stw 3, 8(4)
 	mfsrr1 3
+	stw 3, 12(4)
+	mflr 3
 	stw 3, 16(4)
 
 	// This does two things:

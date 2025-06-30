@@ -134,12 +134,11 @@ typedef struct {
 typedef struct {
 	unsigned gprs[32];
 	double fprs[32];
-	unsigned ctr;
-	unsigned xer;
 	unsigned lr;
+	unsigned xer;
+	unsigned ctr;
 	unsigned cr;
 	unsigned fpscr;
-	unsigned usia;
 } TW_PpcCpuContext;
 
 typedef union {
