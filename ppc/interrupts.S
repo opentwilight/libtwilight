@@ -78,21 +78,29 @@ TW_SwitchContext:
 	mfxer 28
 	mfctr 29
 	mfcr 30
-	mffpscr 31
-	stmw 27, 0x180(3)
 
 	addi 3, 3, 0x80
 	bl TW_SaveFprs
 
-	addi 3, 4, 0x80
-	bl TW_LoadFprs
+	addic 1, 1, -8
+	mffs 0
+	stfd 0, 0(1)
+	lwz 31, 4(1) // Save FPSCR
+	addi 1, 1, 8
 
+	stmw 27, 0x100(3)
+
+	lmw 27, 0x180(4)
 	mtlr 27
 	mtxer 28
 	mtctr 29
 	mtcr 30
-	mtfpscr 31
-	lmw 27, 0x180(4)
+
+	lfd 0, 0x190(4)
+	mtfsf 0xff, 0 // Restore FPSCR
+
+	addi 3, 4, 0x80
+	bl TW_LoadFprs
 
 	lmw 0, 0(4)
 	blr
@@ -100,7 +108,7 @@ TW_SwitchContext:
 .globl TW_GetStoredRegistersAddress
 TW_GetStoredRegistersAddress:
 	bl TW_GetInterruptStackStart
-	addic 3, 3, -208
+	addic 3, 3, -0x194
 	blr
 
 __tw_interrupt_call_scratch:
@@ -120,8 +128,8 @@ __tw_cpu_interrupt_handler_table:
 
 // void _tw_interrupt_handler_impl(unsigned exceptionType, void *stackPointer)
 _tw_interrupt_handler_impl:
-	stw 1, -204(4)
-	addic 1, 4, -208
+	stw 1, -0x190(4)
+	addic 1, 4, -0x194
 	stw 0, 0(1)
 	stw 2, 8(1)
 
@@ -134,18 +142,27 @@ _tw_interrupt_handler_impl:
 	lwz 5, 4(4)   // r5 got clobbered earlier, so restore it here before saving
 	stmw 5, 20(1)
 
-	lwz 25, 8(4)  // SRR0
-	lwz 26, 12(4) // SRR1
 	lwz 27, 16(4) // LR
 
 	lwz 4, 0(4)
 	stw 4, 12(1) // r3
 
+	mr 5, 3
+	addi 3, 1, 0x80
+	bl TW_SaveFprs
+	mr 3, 5
+
 	mfxer 28
 	mfctr 29
 	mfcr 30
-	mffpscr 31
-	stmw 25, 132(1)
+
+	addic 1, 1, -8
+	mffs 0
+	stfd 0, 0(1)
+	lwz 31, 4(1) // Load FPSCR
+	addi 1, 1, 8
+
+	stmw 27, 0x180(1)
 
 	// For some reason, the stack gets accessed out of bounds by _tw_dispatch_interrupt() when compiled with Clang.
 	// Usually this sort of thing is not too concerning, but since this OoB access is a write that overwrites the saved stack pointer,
@@ -154,11 +171,19 @@ _tw_interrupt_handler_impl:
 	bl _tw_dispatch_interrupt
 	addi 1, 1, 32
 
-	lmw 25, 132(1)
+	lmw 27, 0x180(1)
 	mtxer 28
 	mtctr 29
 	mtcr 30
-	mtfpscr 31
+
+	addic 1, 1, -8
+	stw 31, 4(1)
+	lfd 0, 0(1)
+	mtfsf 0xff, 0 // Restore FPSCR
+	addi 1, 1, 8
+
+	addi 3, 1, 0x80
+	bl TW_LoadFprs
 
 	lwz 0, 0(1)
 	lwz 2, 8(1)

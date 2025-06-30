@@ -3,6 +3,8 @@
 #define TW_THREAD_FLAG_ACTIVE    1
 #define TW_THREAD_FLAG_SLEEPING  2
 
+extern void TW_SwitchContext(TW_PpcCpuContext *fromCtx, TW_PpcCpuContext *toCtx);
+
 static int _tw_thread_count = 0;
 static int _tw_next_id = 0;
 static int _tw_cur_thread = 0;
@@ -13,7 +15,7 @@ struct _tw_schedule {
 	unsigned timeReadyLow;
 	unsigned callback;
 };
-static struct _tw_thread_schedule_list[1024] = {0};
+static struct _tw_schedule _tw_thread_schedule_list[1024] = {0};
 
 struct _tw_thread {
 	unsigned flags;
@@ -33,7 +35,8 @@ TwSlabBucket256 _tw_threading_primitives = {};
 
 void TW_SetupThreading(void) {
 	_tw_threading_primitives = TW_CreateSlabBucket256(_tw_first_threading_prims_buf);
-	_tw_thread[0].flags = TW_THREAD_FLAG_ACTIVE;
+	_tw_threads[0].flags = TW_THREAD_FLAG_ACTIVE;
+	_tw_thread_count = 1;
 }
 
 int TW_GetThreadCount(void) {
@@ -71,6 +74,7 @@ int TW_StartThread(void *userData, void *(*entry)(void*)) {
 
 void TW_MaybeAutoSwitchContext(void) {
 	// There could be a more sophisticated system here, eg. that allows for user-specified priority
+	// Also this design starves threads that are further down the list
 	for (int i = 0; i < _tw_thread_count; i++) {
 		if (i != _tw_cur_thread && (_tw_threads[i].flags & TW_THREAD_FLAG_ACTIVE)) {
 			_tw_threads[_tw_cur_thread].flags |= TW_THREAD_FLAG_SLEEPING;
@@ -114,7 +118,7 @@ int TW_ScheduleTask(int durationUs, void (*callback)(void)) {
 	if (slot < 0)
 		slot = _tw_highest_schedule & 0x3ff;
 
-	struct _tw_schedule *s = &_tw_thread_schedule_list[i];
+	struct _tw_schedule *s = &_tw_thread_schedule_list[slot];
 	s->callback = (unsigned)callback | 1;
 	s->timeReadyHigh = (unsigned)(readyTime >> 32);
 	s->timeReadyLow = (unsigned)(readyTime & 0xffffFFFFull);
@@ -190,7 +194,7 @@ TwCondition TW_CreateCondition(void) {
 }
 
 // true if timed out
-int TW_AwaitCondition(TwCondition cv, TwMutex mutex, int timeoutUs) {
+int TW_AwaitCondition(TwCondition cv, TwMutex mutex, int durationUs) {
 	unsigned long long deltaTime = 243ull * (unsigned long long)durationUs;
 	unsigned long long startTime = TW_GetCpuTimeBase();
 	unsigned long long readyTime = startTime + deltaTime;
@@ -208,8 +212,8 @@ int TW_AwaitCondition(TwCondition cv, TwMutex mutex, int timeoutUs) {
 		}
 
 		_tw_threads[_tw_cur_thread].waitingCv = cv;
-		if (timeoutUs > 0)
-			TW_ScheduleTask(_tw_cur_thread, timeoutUs);
+		if (durationUs > 0)
+			TW_ScheduleTask(durationUs, _tw_dispatch_thread);
 		TW_MaybeAutoSwitchContext();
 		PPC_SYNC();
 	}

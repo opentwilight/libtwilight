@@ -280,6 +280,7 @@ int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int m
 void TW_SetupThreading(void);
 int TW_GetThreadCount(void);
 int TW_StartThread(void *userData, void *(*entry)(void*));
+void TW_Sleep(int durationUs);
 TwMutex TW_CreateMutex(void);
 void TW_LockMutex(TwMutex mtx);
 void TW_UnlockMutex(TwMutex mtx);

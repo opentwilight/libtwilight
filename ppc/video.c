@@ -30,6 +30,9 @@ static int _changed = 0;
 static unsigned _frame_counter = 0;
 static unsigned _mode_flags = 0;
 
+static TwMutex _tw_video_mtx = (void*)0;
+static TwCondition _tw_video_cv = (void*)0;
+
 static void vblank_handler() {
 	POKE_U32(TW_VIDEO_REG_BASE + 0x30, (PEEK_U32(TW_VIDEO_REG_BASE + 0x30)) & 0x7fffFFFF);
 	POKE_U32(TW_VIDEO_REG_BASE + 0x34, (PEEK_U32(TW_VIDEO_REG_BASE + 0x34)) & 0x7fffFFFF);
@@ -45,6 +48,7 @@ static void vblank_handler() {
 	}
 
 	_frame_counter++;
+	TW_BroadcastCondition(_tw_video_cv, _tw_video_mtx);
 }
 
 TwVideo _tw_default_video = {0};
@@ -54,6 +58,9 @@ TwVideo *TW_GetDefaultVideo(void) {
 }
 
 static void init_video(TwVideo *params) {
+	_tw_video_mtx = TW_CreateMutex();
+	_tw_video_cv = TW_CreateCondition();
+
 	_default_font = (TwTermFont) {
 		.data = &_glyph_data[0],
 		.width = _glyph_width,
@@ -150,24 +157,23 @@ void TW_InitVideo(TwVideo *params) {
 	TW_InitTwilight();
 	if (!_initialized) {
 		init_video(params);
-		_tw_default_video = *params;
 		_initialized = 1;
 	}
+	_tw_default_video = *params;
 }
 
 void TW_InvalidateVideoTiming() {
-	TW_DisableInterrupts();
 	_changed = 1;
-	TW_EnableInterrupts();
+	PPC_SYNC();
 }
 
 void TW_AwaitVideoVBlank(TwVideo *params) {
-	PPC_SYNC();
+	TW_LockMutex(_tw_video_mtx);
 	unsigned cur_frame = _frame_counter;
 	while (PEEK_U32(&_frame_counter) == cur_frame) {
-		TW_Sleep(20000);
-		PPC_SYNC();
+		TW_AwaitCondition(_tw_video_cv, _tw_video_mtx, 21000);
 	}
+	TW_UnlockMutex(_tw_video_mtx);
 }
 
 // TODO: represent alpha with second Y channel
