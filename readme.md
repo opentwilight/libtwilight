@@ -1,6 +1,6 @@
 # libtwilight
 
-This is an open source, clean slate implementation of a micro kernel for Wii/GC homebrew.
+This is an open source, clean slate implementation of a micro kernel for Wii/GC homebrew with no dependencies.
 
 This library aims provide a suitable foundation for writing high-perfomance games and apps that take full advantage of the hardware.
 
@@ -23,6 +23,7 @@ Bugs abound! The `hello_world` example currently does not work on a real Nintend
 We welcome contributions! However, there are some constraints on what we can allow.
 
 - Any code contribution must be your own. We have a strict "Not Invented Here" policy.
+- Any code contribution must be without dependencies, including libc. The idea is that things will depend on us, not the other way around :)
 - New features that aren't (yet) relevant to the goals of this project will be more heavily scrutinised.
 
 This project is still in its early stages, so bug fixes are extremely welcome :)
@@ -77,7 +78,6 @@ Install LLVM and Clang.
 - GX
 	- Display lists
 	- Textures
-	- Pipelines
 - GC hardware
 	- EXI
 	- DVD
