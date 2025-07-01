@@ -2,11 +2,30 @@
 
 This is an open source, clean slate implementation of a micro kernel for Wii/GC homebrew.
 
-The goal of this library is to provide a suitable foundation for writing high-perfomance games and apps that take full advantage of the hardware.
+This library aims provide a suitable foundation for writing high-perfomance games and apps that take full advantage of the hardware.
 
 It is not trying to be a full-on POSIX-compatible kernel.
 
 Currently in early stages. Gamecube controller input and text output to XFB using a monospace bitmap font is working, and is displayed to the screen.
+
+Bugs abound! The hello_world example currently does not work on a real Nintendo Wii. For now, the only way to run the examples is inside Dolphin Emulator.
+
+## Goals
+
+- Full hardware access, including the GPU
+- Machinery required to implement a basic C/C++/Rust standard library
+- Usable
+	- Relevant build tools
+	- Easy to integrate into a new or existing codebase
+
+## Contributing
+
+We welcome contributions! However, there are some constraints on what we can allow.
+
+- Any code contribution must be your own. We have a strict "Not Invented Here" policy.
+- New features that aren't (yet) relevant to the goals of this project will be more heavily scrutinised.
+
+This project is still in its early stages, so bug fixes are extremely welcome :)
 
 ## Setup
 
@@ -24,6 +43,9 @@ Install LLVM and Clang.
 
 ## TODO
 
+- More tests!
+	- There is a tests folder, which is currently only used to unit test TW_FormatString.
+	- Ideally, this folder could contain integration tests in addition to unit tests.
 - Storage architecture
 	- Hardware layer
 		- See "Wii hardware"
@@ -40,13 +62,7 @@ Install LLVM and Clang.
 		- open, read, write, flush, close, etc.
 		- file table
 		- mount table (accessible through string path)
-- Custom threading implementation
-	- Use decrement register for scheduling software interrupts
-	- Timeouts in `TW_AwaitCondition`
-	- Maybe schedule other threads in `TW_LockMutex` and `TW_AwaitCondition`
-	- Check for deadlock if waiting in `TW_LockMutex` and `TW_AwaitCondition`
-	- If `TW_LockMutex` or `TW_AwaitCondition` is run while in an interrupt, rfi immediately
-- Build Tools
+- Build tools
 	- ELF to DOL
 	- FST generator
 	- GameCube/Wii disc image builder
