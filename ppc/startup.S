@@ -232,14 +232,7 @@ _copy_irq_handler:
 	bge+ _instantiate_irq_handlers_outer
 
 #ifdef TW_WII
-	// initialize IOS IPC
-	lis 4, 0xcd00
-	li 3, 6
-	stw 3, 4(4)
-	li 3, 46 // TW_INTERRUPT_BIT_IPC_BROADWAY
-	lis 4, TW_HandleIosInterrupt@ha
-	addi 4, 4, TW_HandleIosInterrupt@l
-	bl TW_SetExternalInterruptHandler
+	bl TW_SetupIos
 #endif
 	sync
 
@@ -250,12 +243,14 @@ _copy_irq_handler:
 	li 4, 0
 	bl main
 
+// intentionally no blr here -- so that we fall through to TW_Exit upon returning from main
+
 .globl TW_Exit
 TW_Exit:
 	// TODO: iterate backwards through atexit() handler list
 	// TODO: do thread cleanup here (joining, etc)
 #ifdef TW_WII
-	// TODO: close IOS handles, but not IOS itself
+	// TODO: close all non-ES IOS handles, but not IOS itself
 	li 3, 1
 	li 4, 2
 	bl TW_LaunchWiiTitle

@@ -275,10 +275,8 @@ int TW_FormatStringV(TwStream *sink, int maxOutputSize, const char *str, va_list
 int TW_WriteInteger(char *outBuf, int maxSize, int minWidth, unsigned bits, unsigned base, unsigned flags, unsigned long long value);
 int TW_WriteDouble(char *outBuf, int maxSize, int minWidth, int precision, int mode, double value);
 
-// threading
-// TODO: General thread pool
+// threading -- threading_ppc.c or threading_arm.c
 void TW_SetupThreading(void);
-int TW_GetThreadCount(void);
 int TW_StartThread(void *userData, void *(*entry)(void*));
 void TW_Sleep(int durationUs);
 TwMutex TW_CreateMutex(void);

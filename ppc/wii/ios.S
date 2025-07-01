@@ -107,6 +107,15 @@ _tw_ios_check_interrupt_reply:
 	stw 5, 4(3)
 	eieio
 
+	addic 1, 1, -8
+	mflr 0
+	stw 0, 4(1)
+
 	lwz 3, 8(3)
 	bl TW_InvokeMatchingIosCompletionHandler
+
+	lwz 0, 4(1)
+	mtlr 30
+	addi 1, 1, 8
+
 	blr

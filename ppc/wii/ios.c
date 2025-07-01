@@ -4,6 +4,7 @@
 
 extern int TW_RebootIosSync(unsigned *iosBufAligned64Bytes);
 extern void TW_SubmitIosRequest(unsigned *iosBufAligned64Bytes);
+extern void TW_HandleIosInterrupt(void);
 
 static const char *_default_ios_devices[] = {
 	"/dev/aes",
@@ -58,6 +59,11 @@ static TwIoCompletionContext _ios_completion_handlers[32];
 
 static char padding[32];
 static unsigned _ios_completion_write_head = 0;
+
+void TW_SetupIos(void) {
+	TW_SetExternalInterruptHandler(TW_INTERRUPT_BIT_IPC_BROADWAY, TW_HandleIosInterrupt);
+	POKE_U32(0xcd000004, 0x36); // initialise IPC and enable IPC interrupts
+}
 
 int TW_ListIosFolder(unsigned flags, const char *path, int pathLen, TwStream *output) {
 	if (!path || pathLen <= 0)

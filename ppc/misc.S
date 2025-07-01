@@ -1,12 +1,12 @@
 // __toc_size = 0x8000
 // __interrupt_stack_size = 0x10000
-// __stack_size = 0x30000
+// __stack_size = 0x20000
 
 .globl TW_GetTocPointer
 .globl TW_GetInterruptStackStart
 .globl TW_GetMainStackStart
 TW_GetMainStackStart:
-	li 3, 0x480
+	li 3, 0x380
 	b _tw_get_core_pointer_impl
 TW_GetInterruptStackStart:
 	li 3, 0x180

@@ -74,6 +74,7 @@ TW_SaveFprs:
 TW_SwitchContext:
 	stmw 0, 0(3)
 
+	mflr 26 // save program counter as LR
 	mflr 27
 	mfxer 28
 	mfctr 29
@@ -88,28 +89,49 @@ TW_SwitchContext:
 	lwz 31, 4(1) // Save FPSCR
 	addi 1, 1, 8
 
-	stmw 27, 0x100(3)
+	stmw 26, 0x100(3)
 
-	lmw 27, 0x180(4)
-	mtlr 27
-	mtxer 28
-	mtctr 29
-	mtcr 30
-
-	lfd 0, 0x190(4)
+	lfd 0, 0x194(4)
 	mtfsf 0xff, 0 // Restore FPSCR
 
 	addi 3, 4, 0x80
 	bl TW_LoadFprs
 
-	lmw 0, 0(4)
-	blr
+	lmw 26, 0x180(4)
+	mtlr 27
+	mtxer 28
+	mtctr 29
+	mtcr 30
 
-.globl TW_GetStoredRegistersAddress
-TW_GetStoredRegistersAddress:
-	bl TW_GetInterruptStackStart
-	addic 3, 3, -0x194
-	blr
+	li 5, 0x2032
+	mtsrr0 26
+	mtsrr1 5
+
+	lmw 0, 0(4)
+	rfi
+
+.globl TW_EnterContext  // void TW_EnterContext(TW_PpcCpuContext *ctx)
+TW_EnterContext:
+	lfd 0, 0x194(3)
+	mtfsf 0xff, 0 // Restore FPSCR
+
+	mr 5, 3
+	addi 3, 3, 0x80
+	bl TW_LoadFprs
+	mr 3, 5
+
+	lmw 26, 0x180(3)
+	mtlr 27
+	mtxer 28
+	mtctr 29
+	mtcr 30
+
+	li 5, 0x2032
+	mtsrr0 26
+	mtsrr1 5
+
+	lmw 0, 0(3)
+	rfi
 
 __tw_interrupt_call_scratch:
 	.long 0 // r3

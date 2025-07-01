@@ -127,19 +127,20 @@ typedef struct {
 	char nickname[22]; // only 10 bytes used
 	char parentalPasswordAndAnswer[74]; // only 40 bytes used, bytes 4-7 are the password, bytes 8-39 are the answer
 	unsigned char padDeviceCountAndDevices[1 + MAX_PAD_DEVICES * (PAD_DEVICE_SIZE)];
-} TW_DataSysconf;
+} TwSysconf;
 
 #endif
 
 typedef struct {
 	unsigned gprs[32];
 	double fprs[32];
+	unsigned pc;
 	unsigned lr;
 	unsigned xer;
 	unsigned ctr;
 	unsigned cr;
 	unsigned fpscr;
-} TW_PpcCpuContext;
+} TwPpcCpuContext;
 
 typedef union {
 	unsigned words[2];
@@ -225,6 +226,7 @@ void TW_InitExiInterrupts(void);
 int TW_LaunchWiiTitle(unsigned long long titleId);
 
 // ios.c
+void TW_SetupIos(void);
 void TW_InvokeMatchingIosCompletionHandler(unsigned *iob);
 int TW_IoctlvRebootIos(int fd, unsigned method, int nInputs, int nOutputs, TwView *inputsAndOutputs);
 TwFilesystem TW_MakeIosFilesystem(void);
@@ -233,13 +235,9 @@ TwFilesystem TW_MakeIosFilesystem(void);
 TwFile *TW_OpenSdCard(void);
 
 // sysconf.c
-int TW_ReadSysconf(TW_DataSysconf *config);
+int TW_ReadSysconf(TwSysconf *config);
 
 #endif
-
-// TODO: PPC-specific spinlocks, parking, atomics, threads
-// threading_ppc.c
-// Timer interrupt configurable via DEC register (SPR 22)
 
 // misc.S
 extern void *TW_GetTocPointer(void);

@@ -76,11 +76,12 @@ int TW_Printf(const char *fmt, ...) {
 }
 
 void _tw_print_regs(void) {
-	unsigned *regs = TW_GetStoredRegistersAddress();
+	TwPpcCpuContext *ctx = (TwPpcCpuContext*)((unsigned)TW_GetInterruptStackStart() - sizeof(TwPpcCpuContext));
 	for (int i = 0; i < 16; i++)
-		TW_Printf("\x1b[%d;2Hr%d: %08X", 4 + i, i, regs[i]);
+		TW_Printf("\x1b[%d;2Hr%d: %08X", 4 + i, i, ctx->gprs[i]);
 	for (int i = 0; i < 16; i++)
-		TW_Printf("\x1b[%d;18Hr%d: %08X", 4 + i, 16+i, regs[16+i]);
+		TW_Printf("\x1b[%d;18Hr%d: %08X", 4 + i, 16+i, ctx->gprs[16+i]);
+	// TODO: print FPRs and some state registers
 }
 
 void _tw_default_dsi_handler(void) {
