@@ -8,7 +8,7 @@ It is not trying to be a full-on POSIX-compatible kernel.
 
 Currently in early stages. Gamecube controller input and text output to XFB using a monospace bitmap font is working, and is displayed to the screen.
 
-Bugs abound! The hello_world example currently does not work on a real Nintendo Wii. For now, the only way to run the examples is inside Dolphin Emulator.
+Bugs abound! The `hello_world` example currently does not work on a real Nintendo Wii. For now, the only way to run the examples is inside Dolphin Emulator.
 
 ## Goals
 
@@ -39,7 +39,7 @@ Install LLVM and Clang.
 
 ### Wii
 
-`clang -g -target powerpc-eabi -m32 -nostdlib -DTW_WII -Iinclude -Wl,-Tppc/sections.ld ppc/*.S ppc/*.c ppc/wii/*.c common/*.c examples/hello_world.c -o examples/hello_world.elf`
+`clang -g -target powerpc-eabi -m32 -nostdlib -DTW_WII -Iinclude -Wl,-Tppc/sections.ld ppc/*.S ppc/*.c ppc/wii/*.S ppc/wii/*.c common/*.c examples/hello_world.c -o examples/hello_world.elf`
 
 ## TODO
 
