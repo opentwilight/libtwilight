@@ -115,7 +115,7 @@ _tw_ios_check_interrupt_reply:
 	bl TW_InvokeMatchingIosCompletionHandler
 
 	lwz 0, 4(1)
-	mtlr 30
+	mtlr 0
 	addi 1, 1, 8
 
 	blr
