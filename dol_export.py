@@ -9,6 +9,8 @@ def printUsage():
 	print("Options:")
 	print("  --help")
 	print("     Print this help menu")
+	print("  -a / --elf <input file>")
+	print("     Extract all code and data sections, entrypoint and bss from a .ELF file")
 	print("  -o / --output <output file>")
 	print("     Output DOL file")
 	print("  -t / --text <input file> <file offset> <memory address> <size>")
@@ -22,17 +24,70 @@ def printUsage():
 	print("  -e / --entrypoint <address>")
 	print("     Entrypoint address in memory")
 
+def get16(data, offset):
+	return (data[offset] << 8) | data[offset+1]
+
+def get32(data, offset):
+	return (data[offset] << 24) | (data[offset+1] << 16) | (data[offset+2] << 8) | data[offset+3]
+
+def addSectionsFromElf(fname, inputFileMap, codeSections, dataSections):
+	entrypoint = 0
+	bssAddr = 0
+	bssSize = 0
+
+	data = None
+	if fname == "-":
+		data = sys.stdin.buffer.read(size)
+	else:
+		try:
+			data = inputFileMap[fname]
+		except KeyError:
+			pass
+
+		if not data:
+			with open(fname, "rb") as f:
+				data = f.read()
+			inputFileMap[fname] = data
+
+	entrypoint = get32(data, 0x18)
+	phOff = get32(data, 0x1c)
+	shOff = get32(data, 0x20)
+	shSize = get16(data, 0x2e)
+	shCount = get16(data, 0x30)
+
+	for i in range(shCount):
+		p = shOff + i * shSize
+		t = get32(data, p + 4)
+		if t == 0:
+			continue
+		addr = get32(data, p + 12)
+		if addr == 0:
+			continue
+		offset = get32(data, p + 16)
+		size = get32(data, p + 20)
+		if t == 8:
+			bssAddr = addr
+			bssSize = size
+			continue
+		flags = get32(data, p + 8)
+		if (flags & 6) == 6:
+			codeSections.append([fname, offset, addr, size])
+		else:
+			dataSections.append([fname, offset, addr, size])
+
+	return entrypoint, bssAddr, bssSize
+
 def loadSegment(segment, inputFileMap, outputData):
 	fname = segment[0]
 	offset = segment[1]
 	address = segment[2]
 	size = segment[3]
 
+	data = None
 	if fname == "-":
 		data = sys.stdin.buffer.read(size)
 		offset = 0
 	else:
-		data = None
 		try:
 			data = inputFileMap[fname]
 		except KeyError:
@@ -54,6 +109,7 @@ def main(args):
 		return
 
 	outFileName = ""
+	inputFileMap = {}
 	codeSections = []
 	dataSections = []
 	entrypoint = 0
@@ -68,6 +124,10 @@ def main(args):
 			return
 		elif args[idx] == "-o" or args[idx] == "--output":
 			outFileName = args[idx+1]
+			idx += 1
+		elif args[idx] == "-a" or args[idx] == "--elf":
+			fname = args[idx+1]
+			entrypoint, bssAddr, bssSize = addSectionsFromElf(fname, inputFileMap, codeSections, dataSections)
 			idx += 1
 		elif args[idx] == "-t" or args[idx] == "--text":
 			fname = args[idx+1]
@@ -107,13 +167,12 @@ def main(args):
 	if len(codeSections) > 7:
 		print("Too many text/code sections were given (maximum 7)")
 		return
-	if len(dataSections) > 7:
+	if len(dataSections) > 11:
 		print("Too many data sections were given (maximum 11)")
 		return
 
 	header = [0] * 57
 	outputData = bytearray()
-	inputFileMap = {}
 	for i, s in enumerate(codeSections):
 		outOff, addr, size = loadSegment(s, inputFileMap, outputData)
 		header[i], header[18 + i], header[36 + i] = outOff, addr, size
