@@ -42,7 +42,11 @@ def get_args(args):
 		elif args[idx] == "--port":
 			port = int(args[idx+1])
 
-	if not filename or not ip:
+	if not filename:
+		print("Input file was not provided")
+		raise Exception("")
+	if not ip:
+		print("IP address not provided")
 		raise Exception("")
 
 	params_list = [os.path.basename(filename)] + params + added_params
@@ -50,15 +54,15 @@ def get_args(args):
 
 def main(args):
 	try:
-		filename, ip, port, params_list = get_destination(args)
-	except:
+		filename, ip, port, params_list = get_args(args)
+	except Exception as e:
+		print(e)
 		print_help()
 		return
 
 	with open(filename, "rb") as f:
 		u_data = f.read()
 
-	len_uncompressed = os.path.getsize(filename)
 	c_data = zlib.compress(u_data, zlib.Z_DEFAULT_COMPRESSION)
 
 	chunk_size = 1024*128
@@ -66,20 +70,23 @@ def main(args):
 	leftover = len(c_data) % chunk_size
 	total_chunks = full_chunks + (1 if leftover > 0 else 0)
 
-	params = bytes("\x00".join(params_list) + "\x00", "utf8")
+	params = bytearray()
+	for p in params_list:
+		params.extend(bytes(p, "utf8"))
+		params.append(0)
 
 	with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 		s.connect((ip, port))
 
-		s.send("HAXX")
+		s.send(bytes("HAXX", "utf8"))
 		s.send(struct.pack("B",  WIILOAD_VERSION_MAJOR)) # one byte, unsigned
 		s.send(struct.pack("B",  WIILOAD_VERSION_MINOR)) # one byte, unsigned
-		s.send(struct.pack(">H", len(args))) # bigendian, 2 bytes, unsigned
-		s.send(struct.pack(">L", len(c_data))) # bigendian, 4 bytes, unsigned
-		s.send(struct.pack(">L", len_uncompressed)) # bigendian, 4 bytes, unsigned
+		s.send(struct.pack(">H", len(params))) # byte size of arguments
+		s.send(struct.pack(">L", len(c_data))) # compressed length
+		s.send(struct.pack(">L", len(u_data))) # uncompressed length
 
-		print(len(chunks), "chunks to send")
-		
+		print(total_chunks, "chunks to send")
+
 		for c in range(full_chunks):
 			off = c * chunk_size
 			s.send(c_data[off : off+chunk_size])
