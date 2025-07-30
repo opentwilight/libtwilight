@@ -26,8 +26,11 @@ We welcome contributions! However, there are some constraints on what we can all
 - Any code contribution must be without dependencies, including libc. The idea is that things will depend on us, not the other way around :)
 - New features that aren't (yet) relevant to the goals of this project will be more heavily scrutinised.
 
-These constraints do not apply to tools and tests. For those, we are language and framework agnostic.
-The only requirement is that they must be able to be run on my Linux laptop without headaches :)
+These constraints do not apply to tools and tests. For those, we are language and framework agnostic, and are not too concerned about their origin.
+
+For tools and tests, they must:
+- Credit the original authors (if you did not write them)
+- Run on my Linux laptop without headaches :)
 
 This project is still in its early stages, so bug fixes are extremely welcome :)
 
