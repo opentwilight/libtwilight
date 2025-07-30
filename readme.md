@@ -20,11 +20,14 @@ Bugs abound! The `hello_world` example currently does not work on a real Nintend
 
 ## Contributing
 
-We welcome contributions! However, there are some constraints on what we can allow.
+We welcome contributions! However, there are some constraints on what we can allow in the core library, excluding tools and tests.
 
 - Any code contribution must be your own. We have a strict "Not Invented Here" policy.
 - Any code contribution must be without dependencies, including libc. The idea is that things will depend on us, not the other way around :)
 - New features that aren't (yet) relevant to the goals of this project will be more heavily scrutinised.
+
+These constraints do not apply to tools and tests. For those, we are language and framework agnostic.
+The only requirement is that they must be able to be run on my Linux laptop without headaches :)
 
 This project is still in its early stages, so bug fixes are extremely welcome :)
 
