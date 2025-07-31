@@ -139,11 +139,15 @@ _start:
 	mtmsr 6 // We want to disable BATs as we transition to the exception coming up in _init_bats_trampoline
 	isync
 
+	b _after_init_bats
+
 	// initialize BATs. We use a "trampoline" of sorts so that we can save the return address using a bl instruction
 	lis 3, _init_bats@ha
 	rlwinm 3, 3, 0, 1, 31
 	addi 3, 3, _init_bats@l
 	bl _init_bats_trampoline
+
+_after_init_bats:
 
 	// initialize L2 cache
 	li 3, 0x30 // disable everything except BATs
@@ -178,9 +182,13 @@ _wait_for_L2cr_2:
 	mtspr 1017, 3
 	sync
 
-	// restore normal MSR
+_after_l2_init:
+
+	// restore previous MSR, without interrupts
 	mtmsr 6
 	sync
+
+_after_bats_and_cache:
 
 	bl TW_GetTocPointer
 	mr 2, 3
@@ -238,7 +246,14 @@ _copy_irq_handler:
 
 	bl TW_SetupThreading
 	bl TW_SetDefaultCrashHandlers
-	bl TW_EnableInterrupts
+
+_after_interrupt_setup:
+
+	// restore full MSR state, including external interrupts
+	li 3, 0x3032
+	mtmsr 3
+	sync
+
 	li 3, 0
 	li 4, 0
 	bl main
